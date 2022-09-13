@@ -106,14 +106,14 @@ async fn log_message(ctx: &Context, message: Message) {
 
 #[tokio::main]
 async fn main() {
-    let token = match env::var("TOKEN") {
-        Ok(t) => t,
-        Err(_) => panic!("No token was provided (env[TOKEN])"),
-    };
+    let token = env::var("TOKEN").expect("No token was provided (env[TOKEN])");
 
     let mut client = Client::builder(
         token,
-        GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES,
+        GatewayIntents::GUILDS
+            | GatewayIntents::GUILD_MESSAGES
+            | GatewayIntents::DIRECT_MESSAGES
+            | GatewayIntents::MESSAGE_CONTENT,
     )
     .event_handler(Handler)
     .await
