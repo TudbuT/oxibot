@@ -74,7 +74,7 @@ async fn log_message(ctx: &Context, message: Message) {
         let guild = guild
             .to_partial_guild(&ctx.http)
             .await
-            .expect("Bot recieved a message on a guild where he isn't there");
+            .expect("Bot recieved a message on a guild where it isn't there");
 
         let channel = message
             .channel(&ctx.http)
