@@ -1,4 +1,4 @@
-use serenity::{Client, prelude::*, model::prelude::*, async_trait};
+use serenity::{async_trait, model::prelude::*, prelude::*, Client};
 use std::env;
 
 struct Handler;
@@ -7,8 +7,12 @@ struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         ctx.online().await;
-        ctx.set_activity(Activity::watching("C code become rusty")).await;
-        println!("Hello there! Running on {}#{}", ready.user.name, ready.user.discriminator);
+        ctx.set_activity(Activity::watching("C code become rusty"))
+            .await;
+        println!(
+            "Hello there! Running on {}#{}",
+            ready.user.name, ready.user.discriminator
+        );
     }
 
     async fn message(&self, ctx: Context, message: Message) {
@@ -24,7 +28,8 @@ impl EventHandler for Handler {
             .expect("cache is unavilable")
         {
             let mut args = message
-                .content.split(' ')
+                .content
+                .split(' ')
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty());
 
@@ -33,12 +38,11 @@ impl EventHandler for Handler {
             let command = args.next();
             if command.map(|c| c == "ping").unwrap_or(false) {
                 message
-                    .channel_id.say(&ctx.http, "pong!")
+                    .channel_id
+                    .say(&ctx.http, "pong!")
                     .await
                     .map(drop)
-                    .unwrap_or_else(|why| {
-                        eprintln!("unable to send message: {:?}", why)
-                    });
+                    .unwrap_or_else(|why| eprintln!("unable to send message: {:?}", why));
             }
         }
     }
@@ -90,9 +94,15 @@ async fn main() {
         Ok(t) => t,
         Err(_) => panic!("No token was provided (env[TOKEN])"),
     };
-    let mut client = Client::builder(token, GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES)
-        .event_handler(Handler)
-        .await.expect("unable to start client");
+
+    let mut client = Client::builder(
+        token,
+        GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES,
+    )
+    .event_handler(Handler)
+    .await
+    .expect("unable to start client");
+
     if let Err(e) = client.start().await {
         panic!("Error starting client: {e}")
     }
