@@ -5,7 +5,9 @@ use serenity::{
     prelude::*,
     Client,
 };
-use std::env;
+
+#[macro_use]
+extern crate dotenv_codegen;
 
 struct Handler;
 
@@ -106,7 +108,7 @@ async fn log_message(ctx: &Context, message: Message) {
 
 #[tokio::main]
 async fn main() {
-    let token = env::var("TOKEN").expect("No token was provided (env[TOKEN])");
+    let token = dotenv!("TOKEN");
 
     let mut client = Client::builder(
         token,
