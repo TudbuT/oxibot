@@ -10,14 +10,14 @@ impl EventHandler for Handler {
         ctx.set_activity(Activity::watching("C code become rusty")).await;
         println!("Hello there! Running on {}#{}", ready.user.name, ready.user.discriminator);
     }
-    
+
     async fn message(&self, ctx: Context, message: Message) {
         if {
             if let Some(guild) = message.guild_id {
                 if let (Ok(guild), Ok(Some(channel))) = (guild.to_partial_guild(&ctx.http).await, message.channel_id.to_channel(&ctx.http).await.map(|x| x.guild())) {
                     println!(
                         "User {}#{} ({}) in guild {} ({}) channel {} ({}) says message ({}): {}",
-                        message.author.name, message.author.discriminator, message.author.id, 
+                        message.author.name, message.author.discriminator, message.author.id,
                         guild.name, guild.id,
                         channel.name, channel.id,
                         message.id, message.content
@@ -29,7 +29,7 @@ impl EventHandler for Handler {
         } {
             println!(
                 "User {}#{} ({}) in DM says message ({}): {}",
-                message.author.name, message.author.discriminator, message.author.id, 
+                message.author.name, message.author.discriminator, message.author.id,
                 message.id, message.content
             );
         }
