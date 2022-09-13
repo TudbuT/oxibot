@@ -1,4 +1,10 @@
-use serenity::{async_trait, model::prelude::*, prelude::*, Client};
+use serenity::{
+    async_trait,
+    model::application::interaction::Interaction,
+    model::prelude::{command::Command, *},
+    prelude::*,
+    Client,
+};
 use std::env;
 
 struct Handler;
@@ -9,10 +15,40 @@ impl EventHandler for Handler {
         ctx.online().await;
         ctx.set_activity(Activity::watching("C code become rusty"))
             .await;
-        println!(
-            "Hello there! Running on {}#{}",
-            ready.user.name, ready.user.discriminator
-        );
+
+        Command::set_global_application_commands(&ctx.http, |commands| {
+            commands.create_application_command(|command| {
+                command.name("ping").description("simple ping-pong command")
+            })
+        })
+        .await
+        .expect("Recieved an Http error");
+
+        println!("Hello there! Running on {}", ready.user.tag());
+    }
+
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        log_interaction(&ctx, &interaction).await;
+
+        match interaction {
+            Interaction::ApplicationCommand(command) => {
+                let reply = match command.data.name.as_str() {
+                    "ping" => "pong!",
+                    _ => "not implemented yet",
+                };
+
+                command
+                    .create_interaction_response(&ctx.http, |response| {
+                        response
+                            .kind(interaction::InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|message| message.content(reply))
+                    })
+                    .await
+                    .unwrap_or_else(|why| println!("Unable to respond to slash command: {:?}", why))
+            }
+
+            _ => return,
+        }
     }
 
     async fn message(&self, ctx: Context, message: Message) {
@@ -20,35 +56,15 @@ impl EventHandler for Handler {
             return;
         }
 
-        log_message(&ctx, &message).await;
-
-        if message
-            .mentions_me(&ctx.http)
-            .await
-            .expect("cache is unavilable")
-        {
-            let mut args = message
-                .content
-                .split(' ')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty());
-
-            args.next(); // ignore the bot mention
-
-            let command = args.next();
-            if command.map(|c| c == "ping").unwrap_or(false) {
-                message
-                    .channel_id
-                    .say(&ctx.http, "pong!")
-                    .await
-                    .map(drop)
-                    .unwrap_or_else(|why| eprintln!("unable to send message: {:?}", why));
-            }
-        }
+        log_message(&ctx, message).await;
     }
 }
 
-async fn log_message(ctx: &Context, message: &Message) {
+async fn log_interaction(_ctx: &Context, interaction: &Interaction) {
+    println!("{:#?}", interaction)
+}
+
+async fn log_message(ctx: &Context, message: Message) {
     let author = &message.author;
 
     // when the bot recieves a message from a guild
