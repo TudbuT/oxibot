@@ -12,36 +12,75 @@ impl EventHandler for Handler {
     }
 
     async fn message(&self, ctx: Context, message: Message) {
-        if {
-            if let Some(guild) = message.guild_id {
-                if let (Ok(guild), Ok(Some(channel))) = (guild.to_partial_guild(&ctx.http).await, message.channel_id.to_channel(&ctx.http).await.map(|x| x.guild())) {
-                    println!(
-                        "User {}#{} ({}) in guild {} ({}) channel {} ({}) says message ({}): {}",
-                        message.author.name, message.author.discriminator, message.author.id,
-                        guild.name, guild.id,
-                        channel.name, channel.id,
-                        message.id, message.content
-                    );
-                    false
-                }
-                else {true}
-            } else {true}
-        } {
-            println!(
-                "User {}#{} ({}) in DM says message ({}): {}",
-                message.author.name, message.author.discriminator, message.author.id,
-                message.id, message.content
-            );
+        if message.author.bot {
+            return;
         }
-        if let Ok(true) = message.mentions_me(&ctx.http).await {
-            let mut args = message.content.split(" ");
-            let _ = args.next();
-            if let Some(arg0) = args.next() {
-                if arg0 == "ping" {
-                    let _ = message.channel_id.say(ctx.http, "Pong!").await;
-                }
+
+        log_message(&ctx, &message).await;
+
+        if message
+            .mentions_me(&ctx.http)
+            .await
+            .expect("cache is unavilable")
+        {
+            let mut args = message
+                .content.split(' ')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty());
+
+            args.next(); // ignore the bot mention
+
+            let command = args.next();
+            if command.map(|c| c == "ping").unwrap_or(false) {
+                message
+                    .channel_id.say(&ctx.http, "pong!")
+                    .await
+                    .map(drop)
+                    .unwrap_or_else(|why| {
+                        eprintln!("unable to send message: {:?}", why)
+                    });
             }
         }
+    }
+}
+
+async fn log_message(ctx: &Context, message: &Message) {
+    let author = &message.author;
+
+    // when the bot recieves a message from a guild
+    if let Some(ref guild) = message.guild_id {
+        let guild = guild
+            .to_partial_guild(&ctx.http)
+            .await
+            .expect("Bot recieved a message on a guild where he isn't there");
+
+        let channel = message
+            .channel(&ctx.http)
+            .await
+            .expect("Http request failed")
+            .guild();
+
+        println!(
+            "User {} ({}) in guild {} ({}) channel {:?} ({:?}) says message ({}): {}",
+            author.tag(),
+            author.id,
+            guild.name,
+            guild.id,
+            channel.as_ref().map(|c| &c.name),
+            channel.as_ref().map(|c| &c.id),
+            message.id,
+            message.content
+        );
+
+    // when DMing the bot
+    } else {
+        println!(
+            "User {} ({}) in DM says message ({}): {}",
+            author.tag(),
+            author.id,
+            message.id,
+            message.content
+        );
     }
 }
 
