@@ -2,9 +2,10 @@ use std::sync::Mutex;
 
 use serenity::{
     async_trait,
-    model::application::command::{Command, CommandOptionType},
-    model::application::interaction::application_command::CommandDataOptionValue,
-    model::application::interaction::Interaction,
+    model::application::{
+        command::{Command, CommandOptionType},
+        interaction::{application_command::CommandDataOptionValue, Interaction},
+    },
     model::prelude::*,
     prelude::*,
     Client,
@@ -120,7 +121,8 @@ impl EventHandler for Handler {
                             std::fs::write(
                                 WELCOME_MESSAGES_PATH,
                                 serde_json::to_string(&*messages).unwrap(),
-                            ).expect("failed to save the file");
+                            )
+                            .expect("failed to save the file");
 
                             format!("successfully added {:?} as a welcome message!", message)
                         } else {
