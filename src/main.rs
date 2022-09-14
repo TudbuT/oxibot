@@ -1,7 +1,11 @@
+use std::sync::Mutex;
+
 use serenity::{
     async_trait,
+    model::application::command::{Command, CommandOptionType},
+    model::application::interaction::application_command::CommandDataOptionValue,
     model::application::interaction::Interaction,
-    model::prelude::{command::Command, *},
+    model::prelude::*,
     prelude::*,
     Client,
 };
@@ -9,7 +13,47 @@ use serenity::{
 #[macro_use]
 extern crate dotenv_codegen;
 
-struct Handler;
+const WELCOME_MESSAGES_PATH: &'static str = "./welcome-messages.json";
+
+struct Handler {
+    welcome_messages: Mutex<Vec<String>>,
+}
+
+impl Handler {
+    fn new() -> Self {
+        let welcome_messages = {
+            let content = std::fs::read_to_string(WELCOME_MESSAGES_PATH).unwrap_or_default();
+
+            if content.is_empty() {
+                Vec::new()
+            } else {
+                serde_json::from_str(&content)
+                    .expect("'welcome-messages.json' should be a valid JSON array")
+            }
+        };
+
+        println!("welcome messages: {:?}", welcome_messages);
+
+        Self {
+            welcome_messages: Mutex::new(welcome_messages),
+        }
+    }
+}
+
+impl std::ops::Drop for Handler {
+    fn drop(&mut self) {
+        let messages = &*self
+            .welcome_messages
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
+        std::fs::write(
+            WELCOME_MESSAGES_PATH,
+            serde_json::to_string(messages).unwrap(),
+        )
+        .expect("failed to save the file");
+    }
+}
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -21,6 +65,19 @@ impl EventHandler for Handler {
         Command::set_global_application_commands(&ctx.http, |commands| {
             commands.create_application_command(|command| {
                 command.name("ping").description("simple ping-pong command")
+            });
+
+            commands.create_application_command(|command| {
+                command
+                    .name("addmsg")
+                    .description("adds a new welcome message")
+                    .create_option(|option| {
+                        option
+                            .name("message")
+                            .description("the message to add")
+                            .kind(CommandOptionType::String)
+                            .required(true)
+                    })
             })
         })
         .await
@@ -35,8 +92,39 @@ impl EventHandler for Handler {
         match interaction {
             Interaction::ApplicationCommand(command) => {
                 let reply = match command.data.name.as_str() {
-                    "ping" => "pong!",
-                    _ => "not implemented yet",
+                    "ping" => "pong!".to_string(),
+                    "addmsg" => {
+                        let message_arg = command
+                            .data
+                            .options
+                            .get(0)
+                            .expect("expected message option")
+                            .resolved
+                            .as_ref()
+                            .expect("expected a String");
+
+                        if let CommandDataOptionValue::String(message) = message_arg {
+                            let mut messages = self
+                                .welcome_messages
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner());
+
+                            messages.push(message.clone());
+
+                            println!("welcome messages: {:?}", messages);
+
+                            // TODO: optimize this
+                            std::fs::write(
+                                WELCOME_MESSAGES_PATH,
+                                serde_json::to_string(&*messages).unwrap(),
+                            ).expect("failed to save the file");
+
+                            format!("successfully added {:?} as a welcome message!", message)
+                        } else {
+                            "please provide a valid welcome message".to_string()
+                        }
+                    }
+                    _ => "not implemented yet".to_string(),
                 };
 
                 command
@@ -109,7 +197,6 @@ async fn log_message(ctx: &Context, message: Message) {
 #[tokio::main]
 async fn main() {
     let token = dotenv!("TOKEN");
-
     let mut client = Client::builder(
         token,
         GatewayIntents::GUILDS
@@ -117,7 +204,7 @@ async fn main() {
             | GatewayIntents::DIRECT_MESSAGES
             | GatewayIntents::MESSAGE_CONTENT,
     )
-    .event_handler(Handler)
+    .event_handler(Handler::new())
     .await
     .expect("unable to start client");
 

@@ -548,6 +548,8 @@ version = "0.1.0"
 dependencies = [
  "dotenv",
  "dotenv_codegen",
+ "serde",
+ "serde_json",
  "serenity",
  "tokio",
 ]
