@@ -42,21 +42,6 @@ impl Handler {
     }
 }
 
-impl std::ops::Drop for Handler {
-    fn drop(&mut self) {
-        let messages = &*self
-            .welcome_messages
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
-
-        std::fs::write(
-            WELCOME_MESSAGES_PATH,
-            serde_json::to_string(messages).unwrap(),
-        )
-        .expect("failed to save the file");
-    }
-}
-
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
