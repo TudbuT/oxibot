@@ -21,6 +21,7 @@ struct Handler {
 
 impl Handler {
     fn new() -> Self {
+        // load welcome messages on starup
         let welcome_messages = {
             let content = std::fs::read_to_string(WELCOME_MESSAGES_PATH).unwrap_or_default();
 
@@ -62,6 +63,7 @@ impl EventHandler for Handler {
         ctx.set_activity(Activity::watching("C code become rusty"))
             .await;
 
+        // init slash commands
         Command::set_global_application_commands(&ctx.http, |commands| {
             commands.create_application_command(|command| {
                 command.name("ping").description("simple ping-pong command")
@@ -113,6 +115,7 @@ impl EventHandler for Handler {
 
                             println!("welcome messages: {:?}", messages);
 
+                            // save all welcome messages into a file
                             // TODO: optimize this
                             std::fs::write(
                                 WELCOME_MESSAGES_PATH,
@@ -127,6 +130,7 @@ impl EventHandler for Handler {
                     _ => "not implemented yet".to_string(),
                 };
 
+                // reply to an interaction
                 command
                     .create_interaction_response(&ctx.http, |response| {
                         response
@@ -170,6 +174,7 @@ async fn log_message(ctx: &Context, message: Message) {
             .expect("Http request failed")
             .guild();
 
+        // log the message
         println!(
             "User {} ({}) in guild {} ({}) channel {:?} ({:?}) says message ({}): {}",
             author.tag(),
@@ -184,6 +189,7 @@ async fn log_message(ctx: &Context, message: Message) {
 
     // when DMing the bot
     } else {
+        // log the message
         println!(
             "User {} ({}) in DM says message ({}): {}",
             author.tag(),
