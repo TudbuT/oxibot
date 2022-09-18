@@ -190,7 +190,7 @@ async fn log_message(ctx: &Context, message: Message) {
 #[tokio::main]
 async fn main() {
 
-    // grab the token from the environment
+    // grab the token from a .env file located in the project directory
     let token = dotenv!("TOKEN");
     let mut client = Client::builder(
         token,
