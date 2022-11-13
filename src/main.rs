@@ -1,3 +1,5 @@
+mod commands;
+
 use std::sync::Mutex;
 
 use serenity::{
@@ -80,7 +82,7 @@ impl EventHandler for Handler {
         match interaction {
             Interaction::ApplicationCommand(command) => {
                 let reply = match command.data.name.as_str() {
-                    "ping" => "pong!".to_string(),
+                    "ping" => commands::misc::ping(),
                     "addmsg" => {
                         let message_arg = command
                             .data
