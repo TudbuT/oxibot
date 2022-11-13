@@ -52,6 +52,7 @@ impl EventHandler for Handler {
             .await;
 
         // init slash commands
+        //TODO! change these to guild commands for testing
         Command::set_global_application_commands(&ctx.http, |commands| {
             commands.create_application_command(|command| {
                 command.name("ping").description("simple ping-pong command")
@@ -69,6 +70,8 @@ impl EventHandler for Handler {
                             .required(true)
                     })
             })
+
+            //TODO! make tag commands
         })
         .await
         .expect("Recieved an Http error");
@@ -191,7 +194,6 @@ async fn log_message(ctx: &Context, message: Message) {
 
 #[tokio::main]
 async fn main() {
-
     // grab the token from a .env file located in the project directory
     let token = dotenv!("TOKEN");
     let mut client = Client::builder(
@@ -204,12 +206,14 @@ async fn main() {
     .event_handler(Handler::new())
     .await
     .expect("unable to start client");
-    
+
     // ctrl+c handler, allows orderly shutdown of the client
 
     let shard_manager = client.shard_manager.clone();
     tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.expect("Could not register ctrl+c handler");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Could not register ctrl+c handler");
         shard_manager.lock().await.shutdown_all().await;
     });
 
