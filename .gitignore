@@ -1,3 +1,6 @@
-/target
+# Configuration
+.vscode
 .env
-welcome-messages.json
+
+# Build Files
+/target

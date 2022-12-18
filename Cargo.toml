@@ -5,19 +5,18 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.serenity]
-version = "0.11"
-default-features = false
-features = [
-    "client",
-    "gateway",
-    "rustls_backend",
-    "model",
-]
-
 [dependencies]
-dotenv = "0.15.0"
-dotenv_codegen = "0.15.0"
-tokio = { version = "1", features = ["full"] }
-serde = "1.0.144"
-serde_json = "1.0.85"
+poise = "0.5.2"
+tokio = "1.23.0"
+dotenvy = "0.15.6"
+dashmap = "5.4.0"
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = [ "env-filter" ] }
+rand = "0.8.5"
+
+[dependencies.sqlx]
+version = "0.6.2"
+features = [ "macros", "runtime-tokio-rustls", "postgres", "offline" ]
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
