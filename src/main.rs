@@ -1,223 +1,141 @@
-mod commands;
+use std::env;
+use std::env::VarError;
 
-use std::sync::Mutex;
-
-use serenity::{
-    async_trait,
-    model::application::{
-        command::{Command, CommandOptionType},
-        interaction::{application_command::CommandDataOptionValue, Interaction},
-    },
-    model::prelude::*,
-    prelude::*,
-    Client,
+use commands::{
+    guild::guild, help::help, ping::pong, starboard::starboard, tags::*, welcome::welcome,
 };
+use dashmap::DashMap;
+use dotenvy::dotenv;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 
-#[macro_use]
-extern crate dotenv_codegen;
+use crate::event_handlers::event_handler;
+use poise::serenity_prelude as serenity;
+use poise::Prefix;
+use serenity::{Activity, GatewayIntents, Message};
 
-const WELCOME_MESSAGES_PATH: &'static str = "./welcome-messages.json";
+mod commands;
+mod event_handlers;
 
-struct Handler {
-    welcome_messages: Mutex<Vec<String>>,
-}
+const INTENTS: GatewayIntents = GatewayIntents::non_privileged()
+    .union(GatewayIntents::MESSAGE_CONTENT)
+    .union(GatewayIntents::GUILD_MEMBERS);
 
-impl Handler {
-    fn new() -> Self {
-        // load welcome messages on starup
-        let welcome_messages = {
-            let content = std::fs::read_to_string(WELCOME_MESSAGES_PATH).unwrap_or_default();
+type Context<'a> = poise::Context<'a, Data, Error>;
+type Error = Box<dyn std::error::Error + Send + Sync>;
 
-            if content.is_empty() {
-                Vec::new()
-            } else {
-                serde_json::from_str(&content)
-                    .expect("'welcome-messages.json' should be a valid JSON array")
-            }
-        };
-
-        println!("welcome messages: {:?}", welcome_messages);
-
-        Self {
-            welcome_messages: Mutex::new(welcome_messages),
-        }
-    }
-}
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, ready: Ready) {
-        ctx.online().await;
-        ctx.set_activity(Activity::watching("C code become rusty"))
-            .await;
-
-        // init slash commands
-        //TODO! change these to guild commands for testing
-        Command::set_global_application_commands(&ctx.http, |commands| {
-            commands.create_application_command(|command| {
-                command.name("ping").description("simple ping-pong command")
-            });
-
-            commands.create_application_command(|command| {
-                command
-                    .name("addmsg")
-                    .description("adds a new welcome message")
-                    .create_option(|option| {
-                        option
-                            .name("message")
-                            .description("the message to add")
-                            .kind(CommandOptionType::String)
-                            .required(true)
-                    })
-            })
-
-            //TODO! make tag commands
-        })
-        .await
-        .expect("Recieved an Http error");
-
-        println!("Hello there! Running on {}", ready.user.tag());
-    }
-
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        log_interaction(&ctx, &interaction).await;
-
-        match interaction {
-            Interaction::ApplicationCommand(command) => {
-                let reply = match command.data.name.as_str() {
-                    "ping" => commands::misc::ping(),
-                    "addmsg" => {
-                        let message_arg = command
-                            .data
-                            .options
-                            .get(0)
-                            .expect("expected message option")
-                            .resolved
-                            .as_ref()
-                            .expect("expected a String");
-
-                        if let CommandDataOptionValue::String(message) = message_arg {
-                            let mut messages = self
-                                .welcome_messages
-                                .lock()
-                                .unwrap_or_else(|e| e.into_inner());
-
-                            messages.push(message.clone());
-
-                            println!("welcome messages: {:?}", messages);
-
-                            // save all welcome messages into a file
-                            // TODO: optimize this
-                            std::fs::write(
-                                WELCOME_MESSAGES_PATH,
-                                serde_json::to_string(&*messages).unwrap(),
-                            )
-                            .expect("failed to save the file");
-
-                            format!("successfully added {:?} as a welcome message!", message)
-                        } else {
-                            "please provide a valid welcome message".to_string()
-                        }
-                    }
-                    _ => "not implemented yet".to_string(),
-                };
-
-                // reply to an interaction
-                command
-                    .create_interaction_response(&ctx.http, |response| {
-                        response
-                            .kind(interaction::InteractionResponseType::ChannelMessageWithSource)
-                            .interaction_response_data(|message| message.content(reply))
-                    })
-                    .await
-                    .unwrap_or_else(|why| println!("Unable to respond to slash command: {:?}", why))
-            }
-
-            _ => return,
-        }
-    }
-
-    async fn message(&self, ctx: Context, message: Message) {
-        if message.author.bot {
-            return;
-        }
-
-        log_message(&ctx, message).await;
-    }
-}
-
-async fn log_interaction(_ctx: &Context, interaction: &Interaction) {
-    println!("{:#?}", interaction)
-}
-
-async fn log_message(ctx: &Context, message: Message) {
-    let author = &message.author;
-
-    // when the bot recieves a message from a guild
-    if let Some(ref guild) = message.guild_id {
-        let guild = guild
-            .to_partial_guild(&ctx.http)
-            .await
-            .expect("Bot recieved a message on a guild where it isn't there");
-
-        let channel = message
-            .channel(&ctx.http)
-            .await
-            .expect("Http request failed")
-            .guild();
-
-        // log the message
-        println!(
-            "User {} ({}) in guild {} ({}) channel {:?} ({:?}) says message ({}): {}",
-            author.tag(),
-            author.id,
-            guild.name,
-            guild.id,
-            channel.as_ref().map(|c| &c.name),
-            channel.as_ref().map(|c| &c.id),
-            message.id,
-            message.content
-        );
-
-    // when DMing the bot
-    } else {
-        // log the message
-        println!(
-            "User {} ({}) in DM says message ({}): {}",
-            author.tag(),
-            author.id,
-            message.id,
-            message.content
-        );
-    }
+// Data shared across commands and events
+pub struct Data {
+    pub db: PgPool,
+    pub starboard_candidates: DashMap<u64, u32>,
+    pub starboard_tracked: DashMap<u64, (Message, u32)>,
 }
 
 #[tokio::main]
 async fn main() {
-    // grab the token from a .env file located in the project directory
-    let token = dotenv!("TOKEN");
-    let mut client = Client::builder(
-        token,
-        GatewayIntents::GUILDS
-            | GatewayIntents::GUILD_MESSAGES
-            | GatewayIntents::DIRECT_MESSAGES
-            | GatewayIntents::MESSAGE_CONTENT,
-    )
-    .event_handler(Handler::new())
-    .await
-    .expect("unable to start client");
+    let commands = vec![
+        register_commands(),
+        help(),
+        pong(),
+        starboard(),
+        guild(),
+        welcome(),
+        tag_edit(),
+        tag_list(),
+        tags(),
+    ];
 
-    // ctrl+c handler, allows orderly shutdown of the client
-
-    let shard_manager = client.shard_manager.clone();
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Could not register ctrl+c handler");
-        shard_manager.lock().await.shutdown_all().await;
-    });
-
-    if let Err(e) = client.start().await {
-        panic!("Error starting client: {e}")
+    if matches!(dotenv(), Err(dotenvy::Error::Io(_))) && !not_using_dotenv() {
+        println!("You have not included a .env file! If this is intentional you can disable this warning with `DISABLE_NO_DOTENV_WARNING=1`")
     }
+
+    tracing_subscriber::fmt::init();
+
+    // If we used dotenv! you would have to recompile to update these
+    let token = env::var("DISCORD_TOKEN").expect("No discord token found in environment variables");
+    let database_url =
+        env::var("DATABASE_URL").expect("No database url found in environment variables");
+    let (primary_prefix, addition_prefixes) = parse_prefixes();
+
+    let db = PgPoolOptions::new()
+        .connect(&database_url)
+        .await
+        .expect("Failed to connect to database");
+
+    sqlx::migrate!()
+        .run(&db)
+        .await
+        .expect("Unable to apply migrations!");
+
+    let data = Data {
+        db,
+        starboard_candidates: Default::default(),
+        starboard_tracked: Default::default(),
+    };
+
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            prefix_options: poise::PrefixFrameworkOptions {
+                prefix: primary_prefix,
+                additional_prefixes: addition_prefixes,
+                edit_tracker: Some(poise::EditTracker::for_timespan(
+                    std::time::Duration::from_secs(120),
+                )),
+                ..Default::default()
+            },
+            commands,
+            event_handler: |ctx, event, _framework, data| Box::pin(event_handler(ctx, event, data)),
+            ..Default::default()
+        })
+        .token(token)
+        .intents(INTENTS)
+        .setup(|ctx, _ready, framework| {
+            Box::pin(async move {
+                ctx.set_activity(Activity::watching("C code become rusty"))
+                    .await;
+
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+
+                Ok(data)
+            })
+        });
+
+    framework.run().await.unwrap();
+}
+
+fn not_using_dotenv() -> bool {
+    match env::var("DISABLE_NO_DOTENV_WARNING") {
+        Ok(value) if value == "1" => true,
+        Ok(value) if value == "0" => false,
+        Ok(_) => {
+            panic!("DISABLE_NO_DOTENV_WARNING environment variable is equal to something other then 1 or 0")
+        }
+        Err(_) => false,
+    }
+}
+
+fn parse_prefixes() -> (Option<String>, Vec<Prefix>) {
+    let unparsed = match env::var("PREFIXES") {
+        Ok(unparsed) => unparsed,
+        Err(VarError::NotPresent) => return (None, Vec::new()),
+        _ => panic!("Could not handle the environment variable for prefixes"),
+    };
+
+    let mut split = unparsed.split(' ').map(|x| x.to_string());
+
+    let first = split
+        .next()
+        .expect("Could not parse prefixes from environment variables");
+
+    // We need to leak these strings since `Prefix::Literal` only accepts `&'static str` for some reason
+    let split = split
+        .map(|x| Box::leak(Box::new(x)))
+        .map(|x| Prefix::Literal(x));
+
+    (Some(first), split.collect())
+}
+
+#[poise::command(prefix_command, hide_in_help, owners_only)]
+async fn register_commands(ctx: Context<'_>) -> Result<(), Error> {
+    poise::builtins::register_application_commands_buttons(ctx).await?;
+    Ok(())
 }
