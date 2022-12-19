@@ -59,7 +59,7 @@ async fn main() {
     let db = PgPoolOptions::new()
         .connect(&database_url)
         .await
-        .expect("Failed to connect to database");
+        .expect("Failed to connect to database!");
 
     sqlx::migrate!()
         .run(&db)
@@ -67,12 +67,13 @@ async fn main() {
         .expect("Unable to apply migrations!");
 
     let data = Data {
-        db,
+        db: db.clone(),
         starboard_candidates: Default::default(),
         starboard_tracked: Default::default(),
     };
 
-    let framework = poise::Framework::builder()
+    // init settings for the framework
+    let framework_builder = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: primary_prefix,
@@ -99,7 +100,25 @@ async fn main() {
             })
         });
 
-    framework.run().await.unwrap();
+    // actually init the framework
+    let framework = framework_builder
+        .build()
+        .await
+        .expect("Cannot create the bot framework!");
+
+    // ctrl+c handler
+    let shard_handler = framework.shard_manager().clone();
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Couldn't register a ctrl+c handler!");
+        tracing::info!("Shutting down oxibot!");
+        shard_handler.lock().await.shutdown_all().await;
+        db.close().await;
+    });
+
+    tracing::info!("Starting oxibot!");
+    framework.start().await.unwrap();
 }
 
 fn not_using_dotenv() -> bool {
