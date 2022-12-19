@@ -1,5 +1,6 @@
 use crate::{serenity, Data, Error};
 use dashmap::mapref::one::RefMut;
+use poise::serenity_prelude::PartialMember;
 use serenity::{ChannelId, Context, Reaction};
 
 // Maybe have this configurable?
@@ -7,6 +8,15 @@ const MIN_REACTIONS: u32 = 3;
 
 pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(), Error> {
     let message = reaction.message_id.0;
+
+    let reactor = match reaction.member.as_ref() {
+        Some(PartialMember{ user: Some(user), ..}) => user,
+        _ => return Ok(())
+    };
+
+    if &reaction.message(ctx).await?.author == reactor {
+        return Ok(());
+    }
 
     let guild = match reaction.guild_id {
         Some(guild) => guild.0,
