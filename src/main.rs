@@ -44,10 +44,14 @@ async fn main() {
         tags(),
     ];
 
-    if matches!(dotenv(), Err(dotenvy::Error::Io(_))) && !not_using_dotenv() {
-        println!("You have not included a .env file! If this is intentional you can disable this warning with `DISABLE_NO_DOTENV_WARNING=1`")
-    }
-
+    if let Err(err) = dotenv() {
+        if err.not_found() && !not_using_dotenv() {
+            println!("You have not included a .env file! If this is intentional you can disable this warning with `DISABLE_NO_DOTENV_WARNING=1`")
+        } else {
+            panic!("Panicked on dotenv error: {}", err);
+        }
+    };
+    
     tracing_subscriber::fmt::init();
 
     // If we used dotenv! you would have to recompile to update these
