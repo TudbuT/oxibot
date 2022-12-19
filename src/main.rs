@@ -67,7 +67,7 @@ async fn main() {
         .expect("Unable to apply migrations!");
 
     let data = Data {
-        db,
+        db: db.clone(),
         starboard_candidates: Default::default(),
         starboard_tracked: Default::default(),
     };
@@ -114,7 +114,7 @@ async fn main() {
             .expect("Couldn't register a ctrl+c handler!");
         tracing::info!("Shutting down oxibot!");
         shard_handler.lock().await.shutdown_all().await;
-        //TODO! Close the pool without cloning anything
+        db.close().await;
     });
 
     tracing::info!("Starting oxibot!");
