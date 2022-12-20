@@ -51,7 +51,7 @@ async fn main() {
             panic!("Panicked on dotenv error: {}", err);
         }
     };
-    
+
     tracing_subscriber::fmt::init();
 
     // If we used dotenv! you would have to recompile to update these

@@ -1,6 +1,6 @@
 use crate::{serenity, Data, Error};
 use dashmap::mapref::one::RefMut;
-use poise::serenity_prelude::{PartialMember, CacheHttp, Color};
+use poise::serenity_prelude::{Color, PartialMember};
 use serenity::{ChannelId, Context, Reaction};
 
 // Maybe have this configurable?
@@ -10,8 +10,10 @@ pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(
     let message = reaction.message_id.0;
 
     let reactor = match reaction.member.as_ref() {
-        Some(PartialMember{ user: Some(user), ..}) => user,
-        _ => return Ok(())
+        Some(PartialMember {
+            user: Some(user), ..
+        }) => user,
+        _ => return Ok(()),
     };
 
     if &reaction.message(ctx).await?.author == reactor {
@@ -22,7 +24,6 @@ pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(
         Some(guild) => guild.0,
         None => return Ok(()),
     };
-
     let possible_channel = sqlx::query!(
         r#"SELECT starboard_channel as "starboard_channel: [u8; 8]" FROM starboard 
                     WHERE starboard.guild_id = $1 AND starboard.emoji = $2"#,
@@ -85,20 +86,34 @@ async fn create_starboard(
     data.starboard_candidates.remove(&message_id);
 
     let message = reaction.message(ctx).await?;
+    let link = format!("[Jump!]({})", message.link());
     let channel = message.channel(ctx).await?.to_string();
     let emoji = reaction.emoji.to_string();
-    let starboard_message = format!(r"{emoji}{MIN_REACTIONS} | #{channel}");
-    
+    //TODO! this should not assume that the message reactions equal MIN_REACTIONS
+    let starboard_message = format!("{channel} | {emoji} {MIN_REACTIONS}");
+
     let post = ChannelId(starboard_channel)
-        .send_message(ctx, |m| 
-            m.content(starboard_message)
-                .embed(|e|
-                    e.author(|a|
-                        a.icon_url(message.author.face())
-                            .name(message.author.name.clone())
-                    ).description(message.content_safe(ctx))
-                )
-        ).await?;
+        .send_message(ctx, |m| {
+            m.content(starboard_message).embed(|e| {
+                e.author(|a| {
+                    a.icon_url(message.author.face())
+                        .name(message.author.name.clone())
+                })
+                .description(message.content_safe(ctx))
+                .field("Source", link, false)
+                .color(Color::from_rgb(255, 172, 51))
+                .footer(|f| f.text(message.id))
+                .timestamp(message.timestamp.to_string());
+
+                // if the message has a file, try to make it a thumbnail
+                if !message.attachments.is_empty() {
+                    e.image(message.attachments[0].url.clone())
+                } else {
+                    e
+                }
+            })
+        })
+        .await?;
 
     data.starboard_tracked
         .insert(message_id, (post, MIN_REACTIONS));
