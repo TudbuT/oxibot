@@ -1,6 +1,6 @@
 use crate::{serenity, Data, Error};
 use dashmap::mapref::one::RefMut;
-use poise::serenity_prelude::PartialMember;
+use poise::serenity_prelude::{PartialMember, CacheHttp, Color};
 use serenity::{ChannelId, Context, Reaction};
 
 // Maybe have this configurable?
@@ -77,24 +77,31 @@ fn modify_or_insert_candidate(data: &Data, message: u64) -> u32 {
 
 async fn create_starboard(
     data: &Data,
-    message: u64,
+    message_id: u64,
     reaction: &Reaction,
     ctx: &Context,
     starboard_channel: u64,
 ) -> Result<(), Error> {
-    data.starboard_candidates.remove(&message);
+    data.starboard_candidates.remove(&message_id);
 
-    let content = reaction.message(ctx).await?.content;
+    let message = reaction.message(ctx).await?;
+    let channel = message.channel(ctx).await?.to_string();
     let emoji = reaction.emoji.to_string();
-
-    let msg = format!("```\n{content}```\n{emoji} Reactions: {MIN_REACTIONS}");
-
+    let starboard_message = format!(r"{emoji}{MIN_REACTIONS} | #{channel}");
+    
     let post = ChannelId(starboard_channel)
-        .send_message(ctx, |x| x.content(msg))
-        .await?;
+        .send_message(ctx, |m| 
+            m.content(starboard_message)
+                .embed(|e|
+                    e.author(|a|
+                        a.icon_url(message.author.face())
+                            .name(message.author.name.clone())
+                    ).description(message.content_safe(ctx))
+                )
+        ).await?;
 
     data.starboard_tracked
-        .insert(message, (post, MIN_REACTIONS));
+        .insert(message_id, (post, MIN_REACTIONS));
 
     Ok(())
 }
