@@ -14,11 +14,9 @@ pub async fn handle(new_member: &Member, data: &Data, ctx: &Context) -> Result<(
     .await?;
 
     let welcome_channel = match welcome_configs.welcome_channel.map(u64::from_be_bytes) {
-        Some(welcome_channel) => welcome_channel,
+        Some(welcome_channel) => ChannelId(welcome_channel),
         None => return Ok(()),
     };
-
-    let welcome_channel = ChannelId(welcome_channel);
 
     let message = welcome_configs
         .welcome_messages

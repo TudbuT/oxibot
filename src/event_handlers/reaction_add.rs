@@ -1,13 +1,11 @@
 use crate::{serenity, Data, Error, EMBED_COLOR};
 use dashmap::mapref::one::RefMut;
-use serenity::{ChannelId, Context, Reaction, PartialMember};
+use serenity::{ChannelId, Context, Message, MessageId, PartialMember, Reaction};
 
 // Maybe have this configurable?
 const MIN_REACTIONS: u32 = 3;
 
 pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(), Error> {
-    let message = reaction.message_id.0;
-
     let reactor = match reaction.member.as_ref() {
         Some(PartialMember {
             user: Some(user), ..
@@ -15,37 +13,45 @@ pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(
         _ => return Ok(()),
     };
 
-    if &reaction.message(ctx).await?.author == reactor {
+    let message = reaction.message(ctx).await?;
+    let emoji_string = reaction.emoji.to_string();
+
+    if &message.author == reactor {
         return Ok(());
     }
 
-    let guild = match reaction.guild_id {
-        Some(guild) => guild.0,
+    let guild_id = match reaction.guild_id {
+        Some(guild) => guild.0.to_be_bytes(),
         None => return Ok(()),
     };
     let possible_channel = sqlx::query!(
         r#"SELECT starboard_channel as "starboard_channel: [u8; 8]" FROM starboard 
                     WHERE starboard.guild_id = $1 AND starboard.emoji = $2"#,
-        &guild.to_be_bytes(),
-        reaction.emoji.to_string()
+        &guild_id,
+        emoji_string
     )
     .fetch_optional(&data.db)
     .await?;
 
-    let starboard_channel = match possible_channel {
-        Some(record) => u64::from_be_bytes(record.starboard_channel),
+    let starboard = match possible_channel {
+        Some(record) => ChannelId(u64::from_be_bytes(record.starboard_channel)),
         None => return Ok(()),
     };
 
-    match data.starboard_tracked.get_mut(&message) {
+    match data.starboard_tracked.get_mut(&reaction.message_id) {
         Some(value) => {
             modify_existing_starboard(value, ctx).await?;
         }
         None => {
-            let reactions = modify_or_insert_candidate(data, message);
+            let reactions = modify_or_insert_candidate(data, reaction.message_id);
 
             if reactions == MIN_REACTIONS {
-                create_starboard(data, message, reaction, ctx, starboard_channel).await?;
+                data.starboard_candidates.remove(&reaction.message_id);
+
+                let post = create_starboard(ctx, &message, starboard, emoji_string).await?;
+
+                data.starboard_tracked
+                    .insert(reaction.message_id, (post, MIN_REACTIONS));
             }
         }
     }
@@ -54,7 +60,7 @@ pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(
 }
 
 async fn modify_existing_starboard(
-    mut value: RefMut<'_, u64, (serenity::Message, u32)>,
+    mut value: RefMut<'_, MessageId, (serenity::Message, u32)>,
     ctx: &Context,
 ) -> Result<(), Error> {
     let (post, count) = value.value_mut();
@@ -66,7 +72,7 @@ async fn modify_existing_starboard(
     Ok(())
 }
 
-fn modify_or_insert_candidate(data: &Data, message: u64) -> u32 {
+fn modify_or_insert_candidate(data: &Data, message: MessageId) -> u32 {
     *data
         .starboard_candidates
         .entry(message)
@@ -76,22 +82,18 @@ fn modify_or_insert_candidate(data: &Data, message: u64) -> u32 {
 }
 
 async fn create_starboard(
-    data: &Data,
-    message_id: u64,
-    reaction: &Reaction,
     ctx: &Context,
-    starboard_channel: u64,
-) -> Result<(), Error> {
-    data.starboard_candidates.remove(&message_id);
-
-    let message = reaction.message(ctx).await?;
+    message: &Message,
+    starboard: ChannelId,
+    emoji_string: String,
+) -> Result<Message, Error> {
     let link = format!("[Jump!]({})", message.link());
     let channel = message.channel(ctx).await?.to_string();
-    let emoji = reaction.emoji.to_string();
-    //TODO! this should not assume that the message reactions equal MIN_REACTIONS
-    let starboard_message = format!("{channel} | {emoji} {MIN_REACTIONS}");
 
-    let post = ChannelId(starboard_channel)
+    //TODO! this should not assume that the message reactions equal MIN_REACTIONS
+    let starboard_message = format!("{channel} | {emoji_string} {MIN_REACTIONS}");
+
+    starboard
         .send_message(ctx, |m| {
             m.content(starboard_message).embed(|e| {
                 e.author(|a| {
@@ -112,10 +114,6 @@ async fn create_starboard(
                 }
             })
         })
-        .await?;
-
-    data.starboard_tracked
-        .insert(message_id, (post, MIN_REACTIONS));
-
-    Ok(())
+        .await
+        .map_err(|x| x.into())
 }

@@ -16,9 +16,8 @@ pub async fn event_handler(ctx: &Context, event: &Event<'_>, data: &Data) -> Res
         Event::MessageDelete {
             deleted_message_id, ..
         } => {
-            data.starboard_candidates
-                .remove(deleted_message_id.as_u64());
-            let tracked = data.starboard_tracked.remove(deleted_message_id.as_u64());
+            data.starboard_candidates.remove(deleted_message_id);
+            let tracked = data.starboard_tracked.remove(deleted_message_id);
 
             if let Some((_, (starboard, _))) = tracked {
                 starboard.delete(ctx).await?;
