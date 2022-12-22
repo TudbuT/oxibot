@@ -19,9 +19,17 @@ pub async fn create(
     ctx: Context<'_>,
     channel: Channel,
     emoji: Option<ReactionType>,
+    min_reactions: Option<i32>
 ) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
     let guild = ctx.guild().unwrap().id.as_u64().to_be_bytes();
+
+    let min_reactions = min_reactions.unwrap_or(3);
+
+    if min_reactions <= 0 {
+        ctx.say("Minimum reactions should be not zero or negative!").await?;
+        return Ok(());
+    }
 
     let emoji = emoji
         .map(|x| x.to_string())
@@ -30,10 +38,11 @@ pub async fn create(
     let starboard = channel.id().as_u64().to_be_bytes();
 
     sqlx::query!(
-        "INSERT INTO starboard (guild_id, emoji, starboard_channel) VALUES ($1, $2, $3)",
+        "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)",
         &guild,
         emoji,
-        &starboard
+        &starboard,
+        min_reactions
     )
     .execute(&ctx.data().db)
     .await?;
