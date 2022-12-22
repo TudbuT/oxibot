@@ -85,8 +85,7 @@ async fn create_starboard(
     ctx: &Context,
     message: &Message,
     starboard: ChannelId,
-    emoji_string: String
-
+    emoji_string: String,
 ) -> Result<Message, Error> {
     let link = format!("[Jump!]({})", message.link());
     let channel = message.channel(ctx).await?.to_string();
