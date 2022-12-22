@@ -11,10 +11,12 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use crate::event_handlers::event_handler;
 use poise::serenity_prelude as serenity;
 use poise::Prefix;
-use serenity::{Activity, GatewayIntents, Message};
+use serenity::{Activity, GatewayIntents, Message, Color};
 
 mod commands;
 mod event_handlers;
+
+const EMBED_COLOR: Color = Color::from_rgb(255, 172, 51);
 
 const INTENTS: GatewayIntents = GatewayIntents::non_privileged()
     .union(GatewayIntents::MESSAGE_CONTENT)

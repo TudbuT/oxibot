@@ -1,7 +1,6 @@
-use crate::{serenity, Data, Error};
+use crate::{serenity, Data, Error, EMBED_COLOR};
 use dashmap::mapref::one::RefMut;
-use poise::serenity_prelude::{Color, PartialMember};
-use serenity::{ChannelId, Context, Reaction};
+use serenity::{ChannelId, Context, Reaction, PartialMember};
 
 // Maybe have this configurable?
 const MIN_REACTIONS: u32 = 3;
@@ -101,7 +100,7 @@ async fn create_starboard(
                 })
                 .description(message.content_safe(ctx))
                 .field("Source", link, false)
-                .color(Color::from_rgb(255, 172, 51))
+                .color(EMBED_COLOR)
                 .footer(|f| f.text(message.id))
                 .timestamp(message.timestamp.to_string());
 
