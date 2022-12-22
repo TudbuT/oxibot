@@ -3,7 +3,7 @@ use dashmap::mapref::one::RefMut;
 use serenity::{ChannelId, Context, Message, MessageId, PartialMember, Reaction};
 
 // Maybe have this configurable?
-const MIN_REACTIONS: u32 = 1;
+const MIN_REACTIONS: u32 = 3;
 
 pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(), Error> {
     let reactor = match reaction.member.as_ref() {
