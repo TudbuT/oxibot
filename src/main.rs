@@ -11,7 +11,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use crate::event_handlers::event_handler;
 use poise::serenity_prelude as serenity;
 use poise::Prefix;
-use serenity::{Activity, GatewayIntents, Message};
+use serenity::{Activity, GatewayIntents, Message, MessageId};
 
 mod commands;
 mod event_handlers;
@@ -26,8 +26,8 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 // Data shared across commands and events
 pub struct Data {
     pub db: PgPool,
-    pub starboard_candidates: DashMap<u64, u32>,
-    pub starboard_tracked: DashMap<u64, (Message, u32)>,
+    pub starboard_candidates: DashMap<MessageId, u32>,
+    pub starboard_tracked: DashMap<MessageId, (Message, u32)>,
 }
 
 #[tokio::main]
@@ -51,7 +51,7 @@ async fn main() {
             panic!("Panicked on dotenv error: {}", err);
         }
     };
-    
+
     tracing_subscriber::fmt::init();
 
     // If we used dotenv! you would have to recompile to update these

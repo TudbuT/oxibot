@@ -1,51 +1,51 @@
 use crate::{serenity, Data, Error};
 use dashmap::mapref::one::RefMut;
 use poise::serenity_prelude::PartialMember;
-use serenity::{ChannelId, Context, Reaction};
+use serenity::{ChannelId, Context, MessageId, Reaction};
 
 // Maybe have this configurable?
-const MIN_REACTIONS: u32 = 3;
+const MIN_REACTIONS: u32 = 1;
 
 pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(), Error> {
-    let message = reaction.message_id.0;
-
     let reactor = match reaction.member.as_ref() {
-        Some(PartialMember{ user: Some(user), ..}) => user,
-        _ => return Ok(())
+        Some(PartialMember {
+            user: Some(user), ..
+        }) => user,
+        _ => return Ok(()),
     };
 
     if &reaction.message(ctx).await?.author == reactor {
         return Ok(());
     }
 
-    let guild = match reaction.guild_id {
-        Some(guild) => guild.0,
+    let guild_id = match reaction.guild_id {
+        Some(guild) => guild.0.to_be_bytes(),
         None => return Ok(()),
     };
 
     let possible_channel = sqlx::query!(
         r#"SELECT starboard_channel as "starboard_channel: [u8; 8]" FROM starboard 
                     WHERE starboard.guild_id = $1 AND starboard.emoji = $2"#,
-        &guild.to_be_bytes(),
+        &guild_id,
         reaction.emoji.to_string()
     )
     .fetch_optional(&data.db)
     .await?;
 
-    let starboard_channel = match possible_channel {
-        Some(record) => u64::from_be_bytes(record.starboard_channel),
+    let starboard = match possible_channel {
+        Some(record) => ChannelId(u64::from_be_bytes(record.starboard_channel)),
         None => return Ok(()),
     };
 
-    match data.starboard_tracked.get_mut(&message) {
+    match data.starboard_tracked.get_mut(&reaction.message_id) {
         Some(value) => {
             modify_existing_starboard(value, ctx).await?;
         }
         None => {
-            let reactions = modify_or_insert_candidate(data, message);
+            let reactions = modify_or_insert_candidate(data, reaction.message_id);
 
             if reactions == MIN_REACTIONS {
-                create_starboard(data, message, reaction, ctx, starboard_channel).await?;
+                create_starboard(data, reaction.message_id, reaction, ctx, starboard).await?;
             }
         }
     }
@@ -54,7 +54,7 @@ pub async fn handle(reaction: &Reaction, data: &Data, ctx: &Context) -> Result<(
 }
 
 async fn modify_existing_starboard(
-    mut value: RefMut<'_, u64, (serenity::Message, u32)>,
+    mut value: RefMut<'_, MessageId, (serenity::Message, u32)>,
     ctx: &Context,
 ) -> Result<(), Error> {
     let (post, count) = value.value_mut();
@@ -66,7 +66,7 @@ async fn modify_existing_starboard(
     Ok(())
 }
 
-fn modify_or_insert_candidate(data: &Data, message: u64) -> u32 {
+fn modify_or_insert_candidate(data: &Data, message: MessageId) -> u32 {
     *data
         .starboard_candidates
         .entry(message)
@@ -77,10 +77,10 @@ fn modify_or_insert_candidate(data: &Data, message: u64) -> u32 {
 
 async fn create_starboard(
     data: &Data,
-    message: u64,
+    message: MessageId,
     reaction: &Reaction,
     ctx: &Context,
-    starboard_channel: u64,
+    starboard: ChannelId,
 ) -> Result<(), Error> {
     data.starboard_candidates.remove(&message);
 
@@ -89,9 +89,7 @@ async fn create_starboard(
 
     let msg = format!("```\n{content}```\n{emoji} Reactions: {MIN_REACTIONS}");
 
-    let post = ChannelId(starboard_channel)
-        .send_message(ctx, |x| x.content(msg))
-        .await?;
+    let post = starboard.send_message(ctx, |x| x.content(msg)).await?;
 
     data.starboard_tracked
         .insert(message, (post, MIN_REACTIONS));
