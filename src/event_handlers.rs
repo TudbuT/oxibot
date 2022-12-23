@@ -1,7 +1,10 @@
-use crate::{serenity::Context, Data, Error};
+use crate::{serenity, Data, Error};
 use poise::Event;
+use serenity::Context;
 
+mod channel_delete;
 mod guild_member_addition;
+mod message_delete;
 mod reaction_add;
 mod reaction_remove;
 
@@ -16,15 +19,13 @@ pub async fn event_handler(ctx: &Context, event: &Event<'_>, data: &Data) -> Res
         Event::MessageDelete {
             deleted_message_id, ..
         } => {
-            data.starboard_candidates.remove(deleted_message_id);
-            let tracked = data.starboard_tracked.remove(deleted_message_id);
-
-            if let Some((_, (starboard, _))) = tracked {
-                starboard.delete(ctx).await?;
-            }
+            message_delete::handle(deleted_message_id, data, ctx).await?;
         }
         Event::GuildMemberAddition { new_member } => {
             guild_member_addition::handle(new_member, data, ctx).await?;
+        }
+        Event::ChannelDelete { channel } => {
+            channel_delete::handle(channel, data).await?;
         }
         _ => (),
     }

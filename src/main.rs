@@ -11,7 +11,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use crate::event_handlers::event_handler;
 use poise::serenity_prelude as serenity;
 use poise::Prefix;
-use serenity::{Activity, Color, GatewayIntents, Message, MessageId};
+use serenity::{Activity, Color, GatewayIntents, MessageId, ReactionType};
 
 mod commands;
 mod event_handlers;
@@ -28,8 +28,7 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 // Data shared across commands and events
 pub struct Data {
     pub db: PgPool,
-    pub starboard_candidates: DashMap<MessageId, u32>,
-    pub starboard_tracked: DashMap<MessageId, (Message, u32)>,
+    pub starboard_candidates: DashMap<(MessageId, ReactionType), u32>,
 }
 
 #[tokio::main]
@@ -75,7 +74,6 @@ async fn main() {
     let data = Data {
         db: db.clone(),
         starboard_candidates: Default::default(),
-        starboard_tracked: Default::default(),
     };
 
     // init settings for the framework
