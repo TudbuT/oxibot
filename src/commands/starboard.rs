@@ -19,7 +19,7 @@ pub async fn create(
     ctx: Context<'_>,
     channel: Channel,
     emoji: Option<ReactionType>,
-    min_reactions: Option<i32>
+    min_reactions: Option<i32>,
 ) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
     let guild = ctx.guild().unwrap().id.as_u64().to_be_bytes();
@@ -27,7 +27,8 @@ pub async fn create(
     let min_reactions = min_reactions.unwrap_or(3);
 
     if min_reactions <= 0 {
-        ctx.say("Minimum reactions should be not zero or negative!").await?;
+        ctx.say("Minimum reactions should be not zero or negative!")
+            .await?;
         return Ok(());
     }
 
