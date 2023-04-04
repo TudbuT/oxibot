@@ -182,7 +182,7 @@ async fn edit_starboard_entry(
     Ok(())
 }
 
-/// Removes a starboard entry and associated message. Fails silently if entry does not exist.
+/// Removes a starboard entry and associated message in provided channel. Fails silently if entry does not exist.
 pub async fn remove_starboard_entry_with_channel(
     ctx: &Context,
     data: &Data,
@@ -224,6 +224,7 @@ pub async fn remove_starboard_entry_with_channel(
     Ok(())
 }
 
+/// Removes a starboard entry and associated message in provided channel. Fails silently if entry does not exist.
 pub async fn remove_starboard_entry(
     ctx: &Context,
     data: &Data,
