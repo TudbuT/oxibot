@@ -1,4 +1,4 @@
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 
 use crate::Error;
 
@@ -11,14 +11,11 @@ pub struct Data {
 
 impl Data {
     pub fn new(database: PgPool) -> Data {
-        Data {
-            db: database
-        }
+        Data { db: database }
     }
 }
 
 pub async fn init_data(database_url: &str) -> Data {
-
     let database = PgPoolOptions::new()
         .connect(database_url)
         .await
@@ -35,9 +32,12 @@ pub async fn init_data(database_url: &str) -> Data {
 /// Creates a table for the provided guild ID. Errors if there is already a table present,
 /// or if the database errors.
 pub async fn init_guild(data: &Data, guild_id: &u64) -> Result<(), Error> {
-    sqlx::query!("INSERT INTO guild (discord_id) VALUES ($1)", &guild_id.to_be_bytes())
-        .execute(&data.db)
-        .await?;
+    sqlx::query!(
+        "INSERT INTO guild (discord_id) VALUES ($1)",
+        &guild_id.to_be_bytes()
+    )
+    .execute(&data.db)
+    .await?;
 
     Ok(())
 }

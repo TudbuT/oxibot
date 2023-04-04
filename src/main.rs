@@ -4,19 +4,18 @@ use std::env::VarError;
 use commands::{
     guild::guild, help::help, ping::pong, starboard::starboard, tags::*, welcome::welcome,
 };
-use dashmap::DashMap;
+
 pub use data::Data;
 use dotenvy::dotenv;
-use sqlx::{postgres::PgPoolOptions, PgPool};
 
 use crate::event_handlers::event_handler;
 use poise::serenity_prelude as serenity;
 use poise::Prefix;
-use serenity::{Activity, Color, GatewayIntents, MessageId, ReactionType};
+use serenity::{Activity, Color, GatewayIntents};
 
 mod commands;
-mod event_handlers;
 mod data;
+mod event_handlers;
 
 const EMBED_COLOR: Color = Color::from_rgb(255, 172, 51);
 
@@ -52,7 +51,8 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // If we used dotenv! you would have to recompile to update these
-    let token = env::var("DISCORD_TOKEN").expect("No discord token found in environment variables!");
+    let token =
+        env::var("DISCORD_TOKEN").expect("No discord token found in environment variables!");
     let database_url =
         env::var("DATABASE_URL").expect("No database url found in environment variables!");
     let (primary_prefix, addition_prefixes) = parse_prefixes();

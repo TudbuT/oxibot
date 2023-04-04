@@ -1,4 +1,4 @@
-use crate::{Context, Error, data::init_guild};
+use crate::{data::init_guild, Context, Error};
 
 #[poise::command(prefix_command, slash_command, subcommands("init"))]
 pub async fn guild(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {

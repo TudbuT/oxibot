@@ -2,7 +2,13 @@ use poise::serenity_prelude::{ChannelId, Context, Message, MessageId, Reaction, 
 
 use crate::{Data, Error, EMBED_COLOR};
 
-pub async fn add_starboard_tables(data: &Data, guild_id: &u64, channel_id: &u64, emoji: &str, min_reactions: &i32) -> Result<(), Error> {
+pub async fn add_starboard_tables(
+    data: &Data,
+    guild_id: &u64,
+    channel_id: &u64,
+    emoji: &str,
+    min_reactions: &i32,
+) -> Result<(), Error> {
     sqlx::query!(
         "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)",
         &guild_id.to_be_bytes(),
@@ -257,8 +263,6 @@ pub async fn remove_starboard_entry(
     .fetch_all(&data.db)
     .await?;
 
-
-
     // Handle most common states first
     if entries.is_empty() {
         return Ok(());
@@ -275,8 +279,6 @@ pub async fn remove_starboard_entry(
         return Ok(());
     }
 
-    
-
     // If there are duplicate entries, delete all of them
     for entry in entries {
         let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
@@ -290,7 +292,6 @@ pub async fn remove_starboard_entry(
 
 /// Remove the starboard tables associated with `channel_id`
 pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<(), Error> {
-
     let id = channel_id.to_be_bytes();
 
     sqlx::query!(
