@@ -1,8 +1,8 @@
 use crate::serenity::{Channel, ReactionType};
-use crate::{Context, Error};
+use crate::{Context, Error, Data};
 
 //TODO List all of the current starboards under `starboard` and `starboard list`
-#[poise::command(prefix_command, slash_command, subcommands("create"))]
+#[poise::command(prefix_command, slash_command, subcommands("create", "delete"))]
 pub async fn starboard(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
     Ok(())
 }
@@ -49,6 +49,53 @@ pub async fn create(
     .await?;
 
     ctx.say("Done!").await?;
+
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    prefix_command,
+    track_edits,
+    guild_only,
+    required_permissions = "MANAGE_CHANNELS"
+)]
+pub async fn delete(
+    ctx: Context<'_>,
+    channel: Channel,
+    delete_channel: bool
+) -> Result<(), Error> {
+
+    let data = ctx.data();
+
+    delete_starboard_tables(data, *channel.id().as_u64()).await?;
+
+    if delete_channel {
+        channel.delete(ctx).await?;
+    }
+
+    ctx.say("Done!").await?;
+
+    Ok(())
+}
+
+pub async fn delete_starboard_tables(data: &Data, channel_id: u64) -> Result<(), Error> {
+
+    let id = channel_id.to_be_bytes();
+
+    sqlx::query!(
+        "DELETE FROM starboard_tracked WHERE starboard_tracked.starboard_channel = $1",
+        &id
+    )
+    .execute(&data.db)
+    .await?;
+
+    sqlx::query!(
+        "DELETE FROM starboard WHERE starboard.starboard_channel = $1",
+        &id
+    )
+    .execute(&data.db)
+    .await?;
 
     Ok(())
 }
