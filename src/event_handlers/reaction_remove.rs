@@ -1,5 +1,5 @@
 use crate::{serenity, Data, Error};
-use serenity::{ChannelId, Context, Reaction};
+use serenity::{Context, Reaction};
 
 use super::starboard_handler::manage_starboard_entry;
 

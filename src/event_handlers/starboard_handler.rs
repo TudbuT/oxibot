@@ -1,9 +1,12 @@
-use poise::serenity_prelude::{Context, Reaction, ChannelId, Message, User, MessageId};
+use poise::serenity_prelude::{ChannelId, Context, Message, MessageId, Reaction, User};
 
 use crate::{Data, Error, EMBED_COLOR};
 
-pub async fn manage_starboard_entry(ctx: &Context, data: &Data, reaction: &Reaction) -> Result<(), Error> {
-
+pub async fn manage_starboard_entry(
+    ctx: &Context,
+    data: &Data,
+    reaction: &Reaction,
+) -> Result<(), Error> {
     // Check if this reaction is in a guild, and get guild id
     let guild_id = match reaction.guild_id {
         Some(guild) => guild.as_u64().to_be_bytes(),
@@ -12,7 +15,7 @@ pub async fn manage_starboard_entry(ctx: &Context, data: &Data, reaction: &React
 
     let emoji = reaction.emoji.clone();
     let emoji_string = emoji.to_string();
-    
+
     let possible_starboard = sqlx::query!(
         r#"SELECT starboard_channel as "starboard_channel: [u8; 8]", min_reactions FROM starboard 
                     WHERE starboard.guild_id = $1 AND starboard.emoji = $2"#,
@@ -26,7 +29,7 @@ pub async fn manage_starboard_entry(ctx: &Context, data: &Data, reaction: &React
     // Return if we don't have a starboard for this emoji
     let starboard: ([u8; 8], i32) = match possible_starboard {
         Some((starboard_channel, min_reactions)) => (starboard_channel, min_reactions),
-        None => return Ok(())
+        None => return Ok(()),
     };
 
     let message = reaction.message(ctx).await?;
@@ -41,7 +44,15 @@ pub async fn manage_starboard_entry(ctx: &Context, data: &Data, reaction: &React
 
     let length: i32 = reactions.len().try_into()?;
     if length >= min_reactions {
-        add_or_edit_starboard_entry(ctx, data, &message, &reactions, emoji_string.as_str(), starboard_channel).await?;
+        add_or_edit_starboard_entry(
+            ctx,
+            data,
+            &message,
+            &reactions,
+            emoji_string.as_str(),
+            starboard_channel,
+        )
+        .await?;
     } else {
         remove_starboard_entry(ctx, data, &message.id, starboard_channel).await?;
     }
@@ -49,7 +60,14 @@ pub async fn manage_starboard_entry(ctx: &Context, data: &Data, reaction: &React
     Ok(())
 }
 
-async fn add_or_edit_starboard_entry(ctx: &Context, data: &Data, message: &Message, reactions: &Vec<User>, emoji_string: &str, channel: ChannelId) -> Result<(), Error> {
+async fn add_or_edit_starboard_entry(
+    ctx: &Context,
+    data: &Data,
+    message: &Message,
+    reactions: &Vec<User>,
+    emoji_string: &str,
+    channel: ChannelId,
+) -> Result<(), Error> {
     let possible_entry = sqlx::query!(
         r#"SELECT starboard_channel as "starboard_channel: [u8; 8]", starboard_post_id as "starboard_post_id: [u8; 8]", reaction_count FROM starboard_tracked 
                     WHERE starboard_tracked.message_id = $1 AND starboard_tracked.emoji = $2"#,
@@ -61,8 +79,20 @@ async fn add_or_edit_starboard_entry(ctx: &Context, data: &Data, message: &Messa
     .map(|record| (ChannelId(u64::from_be_bytes(record.starboard_channel)), MessageId(u64::from_be_bytes(record.starboard_post_id)), record.reaction_count));
 
     match possible_entry {
-        Some((channel, post_id, reactions)) => edit_starboard_entry(ctx, data, post_id, channel, reactions, emoji_string).await?,
-        None => add_starboard_entry(ctx, data, message, channel, emoji_string, reactions.len().try_into()?).await?
+        Some((channel, post_id, reactions)) => {
+            edit_starboard_entry(ctx, data, post_id, channel, reactions, emoji_string).await?
+        }
+        None => {
+            add_starboard_entry(
+                ctx,
+                data,
+                message,
+                channel,
+                emoji_string,
+                reactions.len().try_into()?,
+            )
+            .await?
+        }
     }
 
     Ok(())
@@ -76,7 +106,6 @@ async fn add_starboard_entry(
     emoji_string: &str,
     current_reactions: i32,
 ) -> Result<(), Error> {
-
     // Formatting message
     let link = format!("[Jump!]({})", message.link());
     let channel = message.channel(ctx).await?.to_string();
@@ -122,7 +151,14 @@ async fn add_starboard_entry(
     Ok(())
 }
 
-async fn edit_starboard_entry(ctx: &Context, data: &Data, message: MessageId, channel: ChannelId, reactions: i32, emoji_string: &str) -> Result<(), Error> {
+async fn edit_starboard_entry(
+    ctx: &Context,
+    data: &Data,
+    message: MessageId,
+    channel: ChannelId,
+    reactions: i32,
+    emoji_string: &str,
+) -> Result<(), Error> {
     let mut post = channel.message(ctx, message).await?;
 
     sqlx::query!(
@@ -133,8 +169,8 @@ async fn edit_starboard_entry(ctx: &Context, data: &Data, message: MessageId, ch
     ).execute(&data.db)
     .await?;
 
-    let content = post.content.trim_end_matches(char::is_numeric).to_string()
-        + &reactions.to_string();
+    let content =
+        post.content.trim_end_matches(char::is_numeric).to_string() + &reactions.to_string();
 
     post.edit(ctx, |x| x.content(content)).await?;
 
@@ -142,8 +178,12 @@ async fn edit_starboard_entry(ctx: &Context, data: &Data, message: MessageId, ch
 }
 
 /// Removes a starboard entry and associated message. Fails silently if entry does not exist.
-pub async fn remove_starboard_entry(ctx: &Context, data: &Data, message: &MessageId, starboard_channel: ChannelId) -> Result<(), Error> {
-
+pub async fn remove_starboard_entry(
+    ctx: &Context,
+    data: &Data,
+    message: &MessageId,
+    starboard_channel: ChannelId,
+) -> Result<(), Error> {
     // Remove + get all entries with the message id. This should return a vec of length zero or one, but is not guaranteed
     let entries: Vec<_> = sqlx::query!(
         r#"DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1 AND starboard_tracked.starboard_channel = $2
@@ -162,11 +202,11 @@ pub async fn remove_starboard_entry(ctx: &Context, data: &Data, message: &Messag
         let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
         starboard_channel.delete_message(ctx, message).await?;
 
-        return Ok(())
+        return Ok(());
     }
-    
-    if entries.len() == 0  {
-        return Ok(())
+
+    if entries.is_empty() {
+        return Ok(());
     }
 
     // If there are duplicate entries, delete all of them

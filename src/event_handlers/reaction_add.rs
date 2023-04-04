@@ -1,5 +1,5 @@
-use crate::{serenity, Data, Error, EMBED_COLOR};
-use serenity::{ChannelId, Context, Message, MessageId, PartialMember, Reaction, ReactionType};
+use crate::{serenity, Data, Error};
+use serenity::{Context, Reaction};
 
 use super::starboard_handler::manage_starboard_entry;
 
