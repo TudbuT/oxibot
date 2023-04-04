@@ -7,7 +7,6 @@ mod guild_member_addition;
 mod message_delete;
 mod reaction_add;
 mod reaction_remove;
-mod starboard_handler;
 
 pub async fn event_handler(ctx: &Context, event: &Event<'_>, data: &Data) -> Result<(), Error> {
     match event {

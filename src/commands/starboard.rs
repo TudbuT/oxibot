@@ -1,5 +1,6 @@
+use crate::data::starboard::{add_starboard_tables, delete_starboard_tables};
 use crate::serenity::{Channel, ReactionType};
-use crate::{Context, Error, Data};
+use crate::{Context, Error, Data, data};
 
 //TODO List all of the current starboards under `starboard` and `starboard list`
 #[poise::command(prefix_command, slash_command, subcommands("create", "delete"))]
@@ -25,7 +26,7 @@ pub async fn create(
     min_reactions: Option<i32>,
 ) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild().unwrap().id.as_u64().to_be_bytes();
+    let guild = &ctx.guild().unwrap().id.as_u64().to_owned();
 
     let min_reactions = min_reactions.unwrap_or(3);
 
@@ -39,17 +40,9 @@ pub async fn create(
         .map(|x| x.to_string())
         .unwrap_or_else(|| "⭐".to_string());
 
-    let starboard = channel.id().as_u64().to_be_bytes();
+    let starboard = &channel.id().as_u64().to_owned();
 
-    sqlx::query!(
-        "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)",
-        &guild,
-        emoji,
-        &starboard,
-        min_reactions
-    )
-    .execute(&ctx.data().db)
-    .await?;
+    add_starboard_tables(ctx.data(), guild, starboard, &emoji.as_str(), &min_reactions).await?;
 
     ctx.say("Done!").await?;
 
@@ -82,27 +75,6 @@ pub async fn delete(
     }
 
     ctx.say("Done!").await?;
-
-    Ok(())
-}
-
-pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<(), Error> {
-
-    let id = channel_id.to_be_bytes();
-
-    sqlx::query!(
-        "DELETE FROM starboard_tracked WHERE starboard_tracked.starboard_channel = $1",
-        &id
-    )
-    .execute(&data.db)
-    .await?;
-
-    sqlx::query!(
-        "DELETE FROM starboard WHERE starboard.starboard_channel = $1",
-        &id
-    )
-    .execute(&data.db)
-    .await?;
 
     Ok(())
 }

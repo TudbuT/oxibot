@@ -2,6 +2,21 @@ use poise::serenity_prelude::{ChannelId, Context, Message, MessageId, Reaction, 
 
 use crate::{Data, Error, EMBED_COLOR};
 
+pub async fn add_starboard_tables(data: &Data, guild_id: &u64, channel_id: &u64, emoji: &str, min_reactions: &i32) -> Result<(), Error> {
+    sqlx::query!(
+        "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)",
+        &guild_id.to_be_bytes(),
+        emoji,
+        &channel_id.to_be_bytes(),
+        min_reactions
+    )
+    .execute(&data.db)
+    .await?;
+
+    Ok(())
+}
+
+/// Manages the starboard response to a change in reactions
 pub async fn manage_starboard_entry(
     ctx: &Context,
     data: &Data,
@@ -65,6 +80,7 @@ pub async fn manage_starboard_entry(
     Ok(())
 }
 
+/// Edits a starboard entry, or creates one if one does not exist
 async fn add_or_edit_starboard_entry(
     ctx: &Context,
     data: &Data,
@@ -103,6 +119,7 @@ async fn add_or_edit_starboard_entry(
     Ok(())
 }
 
+/// Creates a new starboard entry
 async fn add_starboard_entry(
     ctx: &Context,
     data: &Data,
@@ -156,6 +173,7 @@ async fn add_starboard_entry(
     Ok(())
 }
 
+/// Edits an existing starboard entry
 async fn edit_starboard_entry(
     ctx: &Context,
     data: &Data,
@@ -224,7 +242,7 @@ pub async fn remove_starboard_entry_with_channel(
     Ok(())
 }
 
-/// Removes a starboard entry and associated message in provided channel. Fails silently if entry does not exist.
+/// Removes a starboard entry and associated message. Fails silently if entry does not exist.
 pub async fn remove_starboard_entry(
     ctx: &Context,
     data: &Data,
@@ -266,6 +284,28 @@ pub async fn remove_starboard_entry(
         let starboard_channel = ChannelId(u64::from_be_bytes(entry.starboard_channel));
         starboard_channel.delete_message(ctx, message).await?;
     }
+
+    Ok(())
+}
+
+/// Remove the starboard tables associated with `channel_id`
+pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<(), Error> {
+
+    let id = channel_id.to_be_bytes();
+
+    sqlx::query!(
+        "DELETE FROM starboard_tracked WHERE starboard_tracked.starboard_channel = $1",
+        &id
+    )
+    .execute(&data.db)
+    .await?;
+
+    sqlx::query!(
+        "DELETE FROM starboard WHERE starboard.starboard_channel = $1",
+        &id
+    )
+    .execute(&data.db)
+    .await?;
 
     Ok(())
 }

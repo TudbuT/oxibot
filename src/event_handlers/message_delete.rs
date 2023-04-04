@@ -1,7 +1,5 @@
-use crate::{serenity, Data, Error};
+use crate::{serenity, Data, Error, data::starboard::remove_starboard_entry};
 use serenity::{Context, MessageId};
-
-use super::starboard_handler::remove_starboard_entry;
 
 pub async fn handle(
     deleted_message: &MessageId,
