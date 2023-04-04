@@ -59,7 +59,7 @@ pub async fn manage_starboard_entry(
         )
         .await?;
     } else {
-        remove_starboard_entry(ctx, data, &message.id, starboard_channel).await?;
+        remove_starboard_entry_with_channel(ctx, data, &message.id, starboard_channel).await?;
     }
 
     Ok(())
@@ -183,7 +183,7 @@ async fn edit_starboard_entry(
 }
 
 /// Removes a starboard entry and associated message. Fails silently if entry does not exist.
-pub async fn remove_starboard_entry(
+pub async fn remove_starboard_entry_with_channel(
     ctx: &Context,
     data: &Data,
     message: &MessageId,
@@ -218,6 +218,51 @@ pub async fn remove_starboard_entry(
     for entry in entries {
         let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
 
+        starboard_channel.delete_message(ctx, message).await?;
+    }
+
+    Ok(())
+}
+
+pub async fn remove_starboard_entry(
+    ctx: &Context,
+    data: &Data,
+    message: &MessageId,
+) -> Result<(), Error> {
+    // Remove + get all entries with the message id. This should return a vec of length zero or one, but is not guaranteed
+    let entries: Vec<_> = sqlx::query!(
+        r#"DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1
+        RETURNING starboard_post_id as "starboard_post_id: [u8; 8]", starboard_channel as "starboard_channel: [u8; 8]""#,
+        &message.as_u64().to_be_bytes(),
+    )
+    .fetch_all(&data.db)
+    .await?;
+
+
+
+    // Handle most common states first
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    if entries.len() == 1 {
+        // This will not fail because we just checked that we have one entry
+        let entry = entries.first().unwrap();
+
+        let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
+        let starboard_channel = ChannelId(u64::from_be_bytes(entry.starboard_channel));
+        starboard_channel.delete_message(ctx, message).await?;
+
+        return Ok(());
+    }
+
+    
+
+    // If there are duplicate entries, delete all of them
+    for entry in entries {
+        let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
+
+        let starboard_channel = ChannelId(u64::from_be_bytes(entry.starboard_channel));
         starboard_channel.delete_message(ctx, message).await?;
     }
 
