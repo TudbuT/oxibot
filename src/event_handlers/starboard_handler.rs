@@ -42,7 +42,12 @@ pub async fn manage_starboard_entry(
     let starboard_channel = ChannelId(u64::from_be_bytes(starboard.0));
     let min_reactions = starboard.1;
 
-    let length: i32 = reactions.len().try_into()?;
+    let mut length: i32 = reactions.len().try_into()?;
+
+    if reactions.contains(&message.author) {
+        length -= 1;
+    }
+
     if length >= min_reactions {
         add_or_edit_starboard_entry(
             ctx,
