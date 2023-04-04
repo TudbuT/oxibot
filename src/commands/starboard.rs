@@ -17,8 +17,11 @@ pub async fn starboard(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
 )]
 pub async fn create(
     ctx: Context<'_>,
+    #[description = "The channel to put starboard in"]
     channel: Channel,
+    #[description = "A custom emoji instead of a star"]
     emoji: Option<ReactionType>,
+    #[description = "How many reactions you need to get onto starboard"]
     min_reactions: Option<i32>,
 ) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
@@ -53,6 +56,8 @@ pub async fn create(
     Ok(())
 }
 
+
+/// Delete the starboard in the channel, if it exists
 #[poise::command(
     slash_command,
     prefix_command,
@@ -62,15 +67,17 @@ pub async fn create(
 )]
 pub async fn delete(
     ctx: Context<'_>,
+    #[description = "The channel to remove starboard from"]
     channel: Channel,
-    delete_channel: bool
+    #[description = "Whether to delete the channel afterwards. Default is false."]
+    delete: Option<bool>
 ) -> Result<(), Error> {
 
     let data = ctx.data();
 
-    delete_starboard_tables(data, *channel.id().as_u64()).await?;
+    delete_starboard_tables(data, channel.id().as_u64()).await?;
 
-    if delete_channel {
+    if delete.unwrap_or(false) {
         channel.delete(ctx).await?;
     }
 
@@ -79,7 +86,7 @@ pub async fn delete(
     Ok(())
 }
 
-pub async fn delete_starboard_tables(data: &Data, channel_id: u64) -> Result<(), Error> {
+pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<(), Error> {
 
     let id = channel_id.to_be_bytes();
 
