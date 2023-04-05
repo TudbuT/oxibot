@@ -1,0 +1,310 @@
+{
+  "db": "PostgreSQL",
+  "07d3377638196de46dac3f7eb866689de6942f1d15b1efd9daf51a8150a0f6c5": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "INSERT INTO guild (discord_id) VALUES ($1)"
+  },
+  "1f51b2de12c670728eeb49f7593e52101e0188323c2342524d7a5b25b8dede7a": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text",
+          "Bytea",
+          "Int4"
+        ]
+      }
+    },
+    "query": "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)"
+  },
+  "233720ef88711ed4d33f6af49782e21bf134f5fd9a88afbc1a36ccb7ebfa615c": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text",
+          "Bytea",
+          "Bytea",
+          "Int4"
+        ]
+      }
+    },
+    "query": "INSERT INTO starboard_tracked \n                    (message_id, emoji, starboard_channel, starboard_post_id, reaction_count) VALUES ($1, $2, $3, $4, $5)"
+  },
+  "315ebfb62cce47519a68393d5edfa567b57fddf6316289dc66ff2947f96a6383": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "UPDATE guild SET welcome_channel = $1 WHERE guild.discord_id = $2"
+  },
+  "3942735c4902f4cd7b71acbe7e78233236c465d413c4f633099b916352bbe5e0": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "INSERT INTO tag (guild_id, command_name, tag_description) VALUES ($1, $2, $3)"
+  },
+  "5b27766e5f76e6fe944f2c9a4fc7cb02c2e488322dd142be561b97b2f9fbb33f": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text",
+          "Int4"
+        ]
+      }
+    },
+    "query": "UPDATE starboard_tracked SET reaction_count = $3 WHERE starboard_tracked.starboard_post_id = $1 AND starboard_tracked.emoji = $2"
+  },
+  "5e66c4b5552694f14e1575a84194c62d884bcad83240a788aac5816976f0fac5": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "DELETE FROM starboard WHERE starboard.starboard_channel = $1"
+  },
+  "69946ce89c84d0c31408f6d051175282b30bc048c0a59c6aeb85f7c79f573779": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "DELETE FROM starboard_tracked WHERE starboard_tracked.starboard_channel = $1"
+  },
+  "8b49f72bccef624a0c6d2e97a4e183027f482cfef3b3644eb16fd63e5ce4d82e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "welcome_channel: [u8; 8]",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "welcome_messages",
+          "ordinal": 1,
+          "type_info": "TextArray"
+        }
+      ],
+      "nullable": [
+        true,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "SELECT welcome_channel as \"welcome_channel: [u8; 8]\", welcome_messages \n                    FROM guild WHERE guild.discord_id = $1"
+  },
+  "9211d83906f53c80aa114a97f0450259a06d856485907535ab1e62f09c8405b0": {
+    "describe": {
+      "columns": [
+        {
+          "name": "starboard_channel: [u8; 8]",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "min_reactions",
+          "ordinal": 1,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT starboard_channel as \"starboard_channel: [u8; 8]\", min_reactions FROM starboard \n                    WHERE starboard.guild_id = $1 AND starboard.emoji = $2"
+  },
+  "a78b1439d4d9cbd1e5690d314077d827842c87de905311e021cea1a79e124ffb": {
+    "describe": {
+      "columns": [
+        {
+          "name": "starboard_channel: [u8; 8]",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "starboard_post_id: [u8; 8]",
+          "ordinal": 1,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "reaction_count",
+          "ordinal": 2,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT starboard_channel as \"starboard_channel: [u8; 8]\", starboard_post_id as \"starboard_post_id: [u8; 8]\", reaction_count FROM starboard_tracked \n                    WHERE starboard_tracked.message_id = $1 AND starboard_tracked.emoji = $2"
+  },
+  "abd1d2ad24b0e3bdce337b5f5c1956a37f8219f2f189e6f7edaf1c03165c0744": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "UPDATE guild SET welcome_messages = array_append(welcome_messages, $1) WHERE guild.discord_id = $2"
+  },
+  "b8c5577b05b86cacce8431eabc0e97aa71b5bf6898f336dc6995ad71a76647c6": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Bytea",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE tag SET tag_description = $1 WHERE tag.guild_id = $2 AND tag.command_name = $3"
+  },
+  "bfdfa89a2484c35ddc5f6076a412e958a5e98b020fade6d06397a28934f092d3": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text"
+        ]
+      }
+    },
+    "query": "DELETE FROM tag WHERE tag.guild_id = $1 AND tag.command_name = $2"
+  },
+  "cd344e52f3715e2b289cd68abd8948bb1d34939e6446700da79522334d4d4310": {
+    "describe": {
+      "columns": [
+        {
+          "name": "tag_description",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT tag_description FROM tag WHERE tag.guild_id = $1 AND tag.command_name = $2"
+  },
+  "d352afdd8e4118933490c0de7ddf4a8ab652d61d6e6f0680204f2eb88a1dee8c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "command_name",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "tag_description",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "SELECT command_name, tag_description FROM tag WHERE tag.guild_id = $1"
+  },
+  "f3e85e8b57aae6965527afb31e5237aada9d113ae23ab231c60d3f2ed269ee33": {
+    "describe": {
+      "columns": [
+        {
+          "name": "starboard_post_id: [u8; 8]",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "starboard_channel: [u8; 8]",
+          "ordinal": 1,
+          "type_info": "Bytea"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1 \n        RETURNING starboard_post_id as \"starboard_post_id: [u8; 8]\", starboard_channel as \"starboard_channel: [u8; 8]\""
+  }
+}
