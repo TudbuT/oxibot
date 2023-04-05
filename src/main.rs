@@ -4,16 +4,17 @@ use std::env::VarError;
 use commands::{
     guild::guild, help::help, ping::pong, starboard::starboard, tags::*, welcome::welcome,
 };
-use dashmap::DashMap;
+
+pub use data::Data;
 use dotenvy::dotenv;
-use sqlx::{postgres::PgPoolOptions, PgPool};
 
 use crate::event_handlers::event_handler;
 use poise::serenity_prelude as serenity;
 use poise::Prefix;
-use serenity::{Activity, Color, GatewayIntents, MessageId, ReactionType};
+use serenity::{Activity, Color, GatewayIntents};
 
 mod commands;
+mod data;
 mod event_handlers;
 
 const EMBED_COLOR: Color = Color::from_rgb(255, 172, 51);
@@ -24,12 +25,6 @@ const INTENTS: GatewayIntents = GatewayIntents::non_privileged()
 
 type Context<'a> = poise::Context<'a, Data, Error>;
 type Error = Box<dyn std::error::Error + Send + Sync>;
-
-// Data shared across commands and events
-pub struct Data {
-    pub db: PgPool,
-    pub starboard_candidates: DashMap<(MessageId, ReactionType), u32>,
-}
 
 #[tokio::main]
 async fn main() {
@@ -56,25 +51,15 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // If we used dotenv! you would have to recompile to update these
-    let token = env::var("DISCORD_TOKEN").expect("No discord token found in environment variables");
+    let token =
+        env::var("DISCORD_TOKEN").expect("No discord token found in environment variables!");
     let database_url =
-        env::var("DATABASE_URL").expect("No database url found in environment variables");
+        env::var("DATABASE_URL").expect("No database url found in environment variables!");
     let (primary_prefix, addition_prefixes) = parse_prefixes();
 
-    let db = PgPoolOptions::new()
-        .connect(&database_url)
-        .await
-        .expect("Failed to connect to database!");
+    let data = data::init_data(database_url.as_str()).await;
 
-    sqlx::migrate!()
-        .run(&db)
-        .await
-        .expect("Unable to apply migrations!");
-
-    let data = Data {
-        db: db.clone(),
-        starboard_candidates: Default::default(),
-    };
+    let db = data.db.clone();
 
     // init settings for the framework
     let framework_builder = poise::Framework::builder()
