@@ -49,7 +49,7 @@ async fn main() {
         if err.not_found() && !not_using_dotenv() {
             println!("You have not included a .env file! If this is intentional you can disable this warning with `DISABLE_NO_DOTENV_WARNING=1`")
         } else {
-            panic!("Panicked on dotenv error: {}", err);
+            panic!("Panicked on dotenv error: {err}");
         }
     };
 
@@ -126,13 +126,12 @@ async fn main() {
 }
 
 fn not_using_dotenv() -> bool {
-    match env::var("DISABLE_NO_DOTENV_WARNING") {
-        Ok(value) if value == "1" => true,
-        Ok(value) if value == "0" => false,
-        Ok(_) => {
-            panic!("DISABLE_NO_DOTENV_WARNING environment variable is equal to something other then 1 or 0")
-        }
-        Err(_) => false,
+    match env::var("DISABLE_NO_DOTENV_WARNING").as_deref() {
+        Ok("1") => true,
+        Ok("0") => false,
+        Ok(_) => panic!("DISABLE_NO_DOTENV_WARNING environment variable is equal to something other then 1 or 0"),
+        Err(VarError::NotPresent) => false,
+        Err(err) => panic!("{err}")
     }
 }
 
@@ -143,16 +142,17 @@ fn parse_prefixes() -> (Option<String>, Vec<Prefix>) {
         _ => panic!("Could not handle the environment variable for prefixes"),
     };
 
-    let mut split = unparsed.split(' ').map(|x| x.to_string());
+    let mut split = unparsed.split(' ');
 
     let first = split
         .next()
-        .expect("Could not parse prefixes from environment variables");
+        .expect("Could not parse prefixes from environment variables")
+        .to_string();
 
     // We need to leak these strings since `Prefix::Literal` only accepts `&'static str` for some reason
     let split = split
-        .map(|x| Box::leak(Box::new(x)))
-        .map(|x| Prefix::Literal(x));
+        .map(|slice| Box::leak(slice.into()))
+        .map(|leaked| Prefix::Literal(leaked));
 
     (Some(first), split.collect())
 }
