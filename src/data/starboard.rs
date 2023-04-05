@@ -1,19 +1,19 @@
-use poise::serenity_prelude::{ChannelId, Context, Message, MessageId, Reaction, User};
-
+use poise::serenity_prelude::{ChannelId, GuildId, Context, Message, MessageId, Reaction, User};
+use sqlx::Error as SQLxError;
 use crate::{Data, Error, EMBED_COLOR};
 
 pub async fn add_starboard_tables(
     data: &Data,
-    guild_id: &u64,
-    channel_id: &u64,
+    guild_id: GuildId,
+    channel_id: ChannelId,
     emoji: &str,
-    min_reactions: &i32,
-) -> Result<(), Error> {
+    min_reactions: i32,
+) -> Result<(), SQLxError> {
     sqlx::query!(
         "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)",
-        &guild_id.to_be_bytes(),
+        &guild_id.as_u64().to_be_bytes(),
         emoji,
-        &channel_id.to_be_bytes(),
+        &channel_id.as_u64().to_be_bytes(),
         min_reactions
     )
     .execute(&data.db)
@@ -48,28 +48,29 @@ pub async fn manage_starboard_entry(
     .map(|record| (record.starboard_channel, record.min_reactions));
 
     // Return if we don't have a starboard for this emoji
-    let starboard: ([u8; 8], i32) = match possible_starboard {
-        Some((starboard_channel, min_reactions)) => (starboard_channel, min_reactions),
+    let (starboard_channel, min_reactions) = match possible_starboard {
+        Some(starboard) => starboard,
         None => return Ok(()),
     };
+
+    let starboard_channel = ChannelId(u64::from_be_bytes(starboard_channel));
 
     let message = reaction.message(ctx).await?;
 
     let reactions = message
-        .reaction_users(ctx, emoji, None, None)
+        .reaction_users(ctx, emoji, Some(100), None)
         .await
         .unwrap_or(vec![]);
 
-    let starboard_channel = ChannelId(u64::from_be_bytes(starboard.0));
-    let min_reactions = starboard.1;
+    let length = { 
+        if reactions.contains(&message.author) {
+            reactions.len() - 1
+        } else {
+            reactions.len()
+        }
+    };
 
-    let mut length: i32 = reactions.len().try_into()?;
-
-    if reactions.contains(&message.author) {
-        length -= 1;
-    }
-
-    if length >= min_reactions {
+    if length >= min_reactions.try_into().unwrap() {
         add_or_edit_starboard_entry(
             ctx,
             data,
@@ -91,7 +92,7 @@ async fn add_or_edit_starboard_entry(
     ctx: &Context,
     data: &Data,
     message: &Message,
-    reactions: &Vec<User>,
+    reactions: &[User],
     emoji_string: &str,
     channel: ChannelId,
 ) -> Result<(), Error> {
@@ -213,8 +214,7 @@ pub async fn remove_starboard_entry_with_channel(
     message: &MessageId,
     starboard_channel: ChannelId,
 ) -> Result<(), Error> {
-    // Remove + get all entries with the message id. This should return a vec of length zero or one, but is not guaranteed
-    let entries: Vec<_> = sqlx::query!(
+    let entries = sqlx::query!(
         r#"DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1 AND starboard_tracked.starboard_channel = $2
         RETURNING starboard_post_id as "starboard_post_id: [u8; 8]""#,
         &message.as_u64().to_be_bytes(),
@@ -223,22 +223,6 @@ pub async fn remove_starboard_entry_with_channel(
     .fetch_all(&data.db)
     .await?;
 
-    // Handle most common states first
-    if entries.len() == 1 {
-        // This will not fail because we just checked that we have one entry
-        let entry = entries.first().unwrap();
-
-        let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
-        starboard_channel.delete_message(ctx, message).await?;
-
-        return Ok(());
-    }
-
-    if entries.is_empty() {
-        return Ok(());
-    }
-
-    // If there are duplicate entries, delete all of them
     for entry in entries {
         let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
 
@@ -263,27 +247,12 @@ pub async fn remove_starboard_entry(
     .fetch_all(&data.db)
     .await?;
 
-    // Handle most common states first
-    if entries.is_empty() {
-        return Ok(());
-    }
-
-    if entries.len() == 1 {
-        // This will not fail because we just checked that we have one entry
-        let entry = entries.first().unwrap();
-
-        let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
-        let starboard_channel = ChannelId(u64::from_be_bytes(entry.starboard_channel));
-        starboard_channel.delete_message(ctx, message).await?;
-
-        return Ok(());
-    }
-
     // If there are duplicate entries, delete all of them
     for entry in entries {
         let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
 
         let starboard_channel = ChannelId(u64::from_be_bytes(entry.starboard_channel));
+
         starboard_channel.delete_message(ctx, message).await?;
     }
 
@@ -291,22 +260,26 @@ pub async fn remove_starboard_entry(
 }
 
 /// Remove the starboard tables associated with `channel_id`
-pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<(), Error> {
+pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<(), SQLxError> {
     let id = channel_id.to_be_bytes();
+
+    let mut trans = data.db.begin().await?;
 
     sqlx::query!(
         "DELETE FROM starboard_tracked WHERE starboard_tracked.starboard_channel = $1",
         &id
     )
-    .execute(&data.db)
+    .execute(&mut trans)
     .await?;
 
     sqlx::query!(
         "DELETE FROM starboard WHERE starboard.starboard_channel = $1",
         &id
     )
-    .execute(&data.db)
+    .execute(&mut trans)
     .await?;
+
+    trans.commit().await?;
 
     Ok(())
 }

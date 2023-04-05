@@ -21,7 +21,7 @@ pub async fn message(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
 )]
 pub async fn add(ctx: Context<'_>, mut message: String) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild().unwrap().id.as_u64().to_be_bytes();
+    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
 
     if !message.contains("{}") {
         message += " {}"
@@ -51,7 +51,7 @@ pub async fn channel(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
 pub async fn change(ctx: Context<'_>, channel: Channel) -> Result<(), Error> {
     let channel = channel.id().as_u64().to_be_bytes();
     // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild().unwrap().id.as_u64().to_be_bytes();
+    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
 
     sqlx::query!(
         "UPDATE guild SET welcome_channel = $1 WHERE guild.discord_id = $2",
