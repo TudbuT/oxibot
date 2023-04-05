@@ -27,22 +27,6 @@
     },
     "query": "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)"
   },
-  "233720ef88711ed4d33f6af49782e21bf134f5fd9a88afbc1a36ccb7ebfa615c": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Text",
-          "Bytea",
-          "Bytea",
-          "Int4"
-        ]
-      }
-    },
-    "query": "INSERT INTO starboard_tracked \n                    (message_id, emoji, starboard_channel, starboard_post_id, reaction_count) VALUES ($1, $2, $3, $4, $5)"
-  },
   "315ebfb62cce47519a68393d5edfa567b57fddf6316289dc66ff2947f96a6383": {
     "describe": {
       "columns": [],
@@ -69,6 +53,27 @@
       }
     },
     "query": "INSERT INTO tag (guild_id, command_name, tag_description) VALUES ($1, $2, $3)"
+  },
+  "45ca4415954f5a015b7083eb9325671a7a7b56e77e153850c14119c2adde7216": {
+    "describe": {
+      "columns": [
+        {
+          "name": "starboard_post_id: [u8; 8]",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1 AND starboard_tracked.starboard_channel = $2\n        RETURNING starboard_post_id as \"starboard_post_id: [u8; 8]\""
   },
   "5b27766e5f76e6fe944f2c9a4fc7cb02c2e488322dd142be561b97b2f9fbb33f": {
     "describe": {
@@ -281,7 +286,7 @@
     },
     "query": "SELECT command_name, tag_description FROM tag WHERE tag.guild_id = $1"
   },
-  "f3e85e8b57aae6965527afb31e5237aada9d113ae23ab231c60d3f2ed269ee33": {
+  "fa95d098c655e6688ded33eaf70b067630c5104551cb0f1e9682d86be27e7e71": {
     "describe": {
       "columns": [
         {
@@ -305,6 +310,22 @@
         ]
       }
     },
-    "query": "DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1 \n        RETURNING starboard_post_id as \"starboard_post_id: [u8; 8]\", starboard_channel as \"starboard_channel: [u8; 8]\""
+    "query": "DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1\n        RETURNING starboard_post_id as \"starboard_post_id: [u8; 8]\", starboard_channel as \"starboard_channel: [u8; 8]\""
+  },
+  "ffe566d52c76a6c4bfca21d3061c02391683ae9772811a34554dd4251c4e7afe": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Text",
+          "Bytea",
+          "Bytea",
+          "Int4"
+        ]
+      }
+    },
+    "query": "INSERT INTO starboard_tracked \n        (message_id, emoji, starboard_channel, starboard_post_id, reaction_count) VALUES ($1, $2, $3, $4, $5)"
   }
 }

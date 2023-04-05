@@ -53,11 +53,9 @@ async fn main() {
     // If we used dotenv! you would have to recompile to update these
     let token =
         env::var("DISCORD_TOKEN").expect("No discord token found in environment variables!");
-    let database_url =
-        env::var("DATABASE_URL").expect("No database url found in environment variables!");
     let (primary_prefix, addition_prefixes) = parse_prefixes();
 
-    let data = data::init_data(database_url.as_str()).await;
+    let data = data::init_data().await;
 
     let db = data.db.clone();
 
