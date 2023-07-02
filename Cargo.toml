@@ -6,16 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-poise = "0.5.2"
-tokio = { version = "1.26.0", features = [ "rt-multi-thread", "macros", "sync", "signal" ] }
-dotenvy = "0.15.6"
+poise = "0.5.5"
+tokio = { version = "1.29.1", features = [ "rt-multi-thread", "macros", "sync", "signal" ] }
+dotenvy = "0.15.7"
 dashmap = "5.4.0"
 tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.16", features = [ "env-filter" ] }
+tracing-subscriber = { version = "0.3.17", features = [ "env-filter" ] }
 rand = "0.8.5"
 
 [dependencies.sqlx]
-version = "0.6.2"
+version = "0.6.3"
 features = [ "macros", "runtime-tokio-rustls", "postgres", "offline" ]
 
 [profile.dev.package.sqlx-macros]
