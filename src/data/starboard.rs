@@ -1,6 +1,6 @@
-use poise::serenity_prelude::{ChannelId, GuildId, Context, Message, MessageId, Reaction, User};
-use sqlx::Error as SQLxError;
 use crate::{Data, Error, EMBED_COLOR};
+use poise::serenity_prelude::{ChannelId, Context, GuildId, Message, MessageId, Reaction, User};
+use sqlx::Error as SQLxError;
 
 pub async fn add_starboard_tables(
     data: &Data,
@@ -62,7 +62,7 @@ pub async fn manage_starboard_entry(
         .await
         .unwrap_or(vec![]);
 
-    let length = { 
+    let length = {
         if reactions.contains(&message.author) {
             reactions.len() - 1
         } else {

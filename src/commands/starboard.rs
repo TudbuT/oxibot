@@ -24,7 +24,10 @@ pub async fn create(
 ) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
     let guild = ctx.guild_id().unwrap();
-    let starboard = starboard.as_ref().map(Channel::id).unwrap_or(ctx.channel_id());
+    let starboard = starboard
+        .as_ref()
+        .map(Channel::id)
+        .unwrap_or(ctx.channel_id());
 
     let min_reactions = min_reactions.unwrap_or(3);
 
@@ -61,7 +64,10 @@ pub async fn delete(
     >,
 ) -> Result<(), Error> {
     let data = ctx.data();
-    let starboard = starboard.as_ref().map(Channel::id).unwrap_or(ctx.channel_id());
+    let starboard = starboard
+        .as_ref()
+        .map(Channel::id)
+        .unwrap_or(ctx.channel_id());
 
     delete_starboard_tables(data, starboard.as_u64()).await?;
 

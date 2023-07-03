@@ -1,5 +1,5 @@
-use sqlx::{postgres::PgPoolOptions, PgPool, Error};
 use poise::serenity_prelude::GuildId;
+use sqlx::{postgres::PgPoolOptions, Error, PgPool};
 use std::env;
 
 pub mod starboard;
