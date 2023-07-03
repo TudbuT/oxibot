@@ -1,6 +1,10 @@
+use std::mem;
+
 use crate::{serenity, Data, Error};
+use poise::serenity_prelude::Mentionable;
 use rand::seq::SliceRandom;
 use serenity::{ChannelId, Context, Member};
+use serenity::model::channel::MessageFlags;
 
 pub async fn handle(new_member: &Member, data: &Data, ctx: &Context) -> Result<(), Error> {
     let channel = new_member.guild_id.as_u64().to_be_bytes();
@@ -23,10 +27,13 @@ pub async fn handle(new_member: &Member, data: &Data, ctx: &Context) -> Result<(
         .choose(&mut rand::thread_rng())
         .map(|x| x.as_str())
         .unwrap_or("{} joined a server without any welcome message, how uncreative!")
-        .replace("{}", new_member.display_name().as_str());
+        .replace("{}", new_member.mention().to_string().as_str());
+
+    // SAFETY: we are transmuting to a u64 bitfield, and discord supports silent pings with this one
+    const SILENT_FLAG: MessageFlags = unsafe { mem::transmute(4096_u64) };
 
     welcome_channel
-        .send_message(ctx, |x| x.content(message))
+        .send_message(ctx, |x| x.content(message).flags(SILENT_FLAG))
         .await?;
 
     Ok(())
