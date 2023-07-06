@@ -1,3 +1,5 @@
+use tracing_subscriber::fmt::format;
+
 use crate::serenity::Channel;
 use crate::{Context, Error};
 
@@ -42,11 +44,22 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
     let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
 
-    let welcome_messages = sqlx::query!("SELECT welcome_messages FROM guild WHERE guild.discord_id = $1", &guild)
-        .fetch_one(&ctx.data().db)
-        .await?.welcome_messages;
+    let welcome_messages = sqlx::query!(
+        "SELECT welcome_messages FROM guild WHERE guild.discord_id = $1",
+        &guild
+    )
+    .fetch_one(&ctx.data().db)
+    .await?
+    .welcome_messages;
 
-    ctx.say(welcome_messages.join("\n")).await?;
+    let mut formated_messages: String = welcome_messages
+        .into_iter()
+        .map(|message| format!("```\n{message}```\n"))
+        .collect();
+
+    formated_messages.pop();
+
+    ctx.say(formated_messages).await?;
 
     Ok(())
 }
