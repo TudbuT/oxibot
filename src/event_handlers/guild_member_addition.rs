@@ -11,7 +11,7 @@ pub async fn handle(new_member: &Member, data: &Data, ctx: &Context) -> Result<(
     let channel = new_member.guild_id.0 as i64;
 
     let welcome_configs = sqlx::query!(
-        r#"SELECT welcome_channel as "welcome_channel: database::ChannelId", (welcome_messages)[trunc(random() * array_length(welcome_messages, 1))::int] as welcome_message
+        r#"SELECT welcome_channel as "welcome_channel: database::ChannelId", (welcome_messages)[1 + trunc(random() * array_length(welcome_messages, 1))::int] as welcome_message
                     FROM guild WHERE guild.discord_id = $1"#,
         &channel
     )
