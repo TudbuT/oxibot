@@ -5,12 +5,13 @@ use poise::serenity_prelude::{Mention, Mentionable};
 use serenity::model::channel::MessageFlags;
 use serenity::{ChannelId, Context, Member};
 use std::fmt::Write;
+use crate::database;
 
 pub async fn handle(new_member: &Member, data: &Data, ctx: &Context) -> Result<(), Error> {
-    let channel = new_member.guild_id.as_u64().to_be_bytes();
+    let channel = new_member.guild_id.0 as i64;
 
     let welcome_configs = sqlx::query!(
-        r#"SELECT welcome_channel as "welcome_channel: [u8; 8]", (welcome_messages)[trunc(random() * array_length(welcome_messages, 1))::int] as welcome_message
+        r#"SELECT welcome_channel as "welcome_channel: database::ChannelId", (welcome_messages)[trunc(random() * array_length(welcome_messages, 1))::int] as welcome_message
                     FROM guild WHERE guild.discord_id = $1"#,
         &channel
     )
@@ -18,7 +19,7 @@ pub async fn handle(new_member: &Member, data: &Data, ctx: &Context) -> Result<(
     .await?;
 
     let welcome_channel = match welcome_configs.welcome_channel {
-        Some(welcome_channel) => ChannelId(u64::from_be_bytes(welcome_channel)),
+        Some(welcome_channel) => welcome_channel.into_serenity(),
         None => return Ok(()),
     };
 

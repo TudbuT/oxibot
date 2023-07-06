@@ -1,5 +1,3 @@
-use tracing_subscriber::fmt::format;
-
 use crate::serenity::Channel;
 use crate::{Context, Error};
 
@@ -21,10 +19,10 @@ pub async fn message(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
     required_permissions = "MANAGE_CHANNELS"
 )]
 pub async fn add(ctx: Context<'_>, message: String) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
-    sqlx::query!("UPDATE guild SET welcome_messages = array_append(welcome_messages, $1) WHERE guild.discord_id = $2", message, &guild)
+    sqlx::query!("UPDATE guild SET welcome_messages = array_append(welcome_messages, $1) WHERE guild.discord_id = $2", message, guild)
         .execute(&ctx.data().db)
         .await?;
 
@@ -38,15 +36,14 @@ pub async fn add(ctx: Context<'_>, message: String) -> Result<(), Error> {
     slash_command,
     prefix_command,
     guild_only,
-    required_permissions = "MANAGE_CHANNELS"
 )]
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
     let welcome_messages = sqlx::query!(
         "SELECT welcome_messages FROM guild WHERE guild.discord_id = $1",
-        &guild
+        guild
     )
     .fetch_one(&ctx.data().db)
     .await?
@@ -59,6 +56,7 @@ pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
 
     formated_messages.pop();
 
+    ctx.defer_ephemeral().await?;
     ctx.say(formated_messages).await?;
 
     Ok(())
@@ -77,14 +75,14 @@ pub async fn channel(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
     required_permissions = "MANAGE_CHANNELS"
 )]
 pub async fn change(ctx: Context<'_>, channel: Channel) -> Result<(), Error> {
-    let channel = channel.id().as_u64().to_be_bytes();
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    let channel = channel.id().0 as i64;
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
     sqlx::query!(
         "UPDATE guild SET welcome_channel = $1 WHERE guild.discord_id = $2",
-        &channel,
-        &guild
+        channel,
+        guild
     )
     .execute(&ctx.data().db)
     .await?;

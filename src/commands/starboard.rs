@@ -21,7 +21,7 @@ pub async fn create(
     #[description = "A custom emoji instead of a star"] emoji: Option<ReactionType>,
     #[description = "How many reactions you need to get onto starboard"] min_reactions: Option<i32>,
 ) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
+    // SAFETY: Since this command is guild_only this should NEVER fail
     let guild = ctx.guild_id().unwrap();
     let starboard = starboard
         .as_ref()
@@ -67,7 +67,7 @@ pub async fn delete(
         .map(Channel::id)
         .unwrap_or(ctx.channel_id());
 
-    delete_starboard_tables(data, starboard.as_u64()).await?;
+    delete_starboard_tables(data, starboard).await?;
 
     if delete.unwrap_or(false) {
         starboard.delete(ctx).await?;

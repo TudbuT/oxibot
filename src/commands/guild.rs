@@ -13,7 +13,7 @@ pub async fn guild(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
     required_permissions = "MANAGE_GUILD"
 )]
 pub async fn init(ctx: Context<'_>) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
+    // SAFETY: Since this command is guild_only this should NEVER fail
     let guild = ctx.guild_id().unwrap();
 
     init_guild(ctx.data(), guild).await?;
