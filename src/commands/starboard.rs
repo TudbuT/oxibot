@@ -1,4 +1,4 @@
-use crate::data::starboard::{add_starboard_tables, delete_starboard_tables};
+use crate::database::starboard::{add_starboard_tables, delete_starboard_tables};
 use crate::serenity::{Channel, ReactionType};
 use crate::{Context, Error};
 
@@ -12,7 +12,6 @@ pub async fn starboard(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
 #[poise::command(
     slash_command,
     prefix_command,
-    track_edits,
     guild_only,
     required_permissions = "MANAGE_CHANNELS"
 )]
@@ -52,7 +51,6 @@ pub async fn create(
 #[poise::command(
     slash_command,
     prefix_command,
-    track_edits,
     guild_only,
     required_permissions = "MANAGE_CHANNELS"
 )]

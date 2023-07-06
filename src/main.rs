@@ -5,7 +5,7 @@ use commands::{
     guild::guild, help::help, ping::pong, starboard::starboard, tags::*, welcome::welcome,
 };
 
-pub use data::Data;
+pub use database::Data;
 use dotenvy::dotenv;
 
 use crate::event_handlers::event_handler;
@@ -14,7 +14,7 @@ use poise::Prefix;
 use serenity::{Activity, Color, GatewayIntents};
 
 mod commands;
-mod data;
+mod database;
 mod event_handlers;
 
 const EMBED_COLOR: Color = Color::from_rgb(255, 172, 51);
@@ -55,7 +55,7 @@ async fn main() {
         env::var("DISCORD_TOKEN").expect("No discord token found in environment variables!");
     let (primary_prefix, addition_prefixes) = parse_prefixes();
 
-    let data = data::init_data().await;
+    let data = database::init_data().await;
 
     let db = data.db.clone();
 

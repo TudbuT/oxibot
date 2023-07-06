@@ -269,14 +269,14 @@ pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<()
         "DELETE FROM starboard_tracked WHERE starboard_tracked.starboard_channel = $1",
         &id
     )
-    .execute(&mut trans)
+    .execute(trans.as_mut())
     .await?;
 
     sqlx::query!(
         "DELETE FROM starboard WHERE starboard.starboard_channel = $1",
         &id
     )
-    .execute(&mut trans)
+    .execute(trans.as_mut())
     .await?;
 
     trans.commit().await?;

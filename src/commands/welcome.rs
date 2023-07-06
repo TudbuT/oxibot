@@ -15,17 +15,12 @@ pub async fn message(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
 #[poise::command(
     slash_command,
     prefix_command,
-    track_edits,
     guild_only,
     required_permissions = "MANAGE_CHANNELS"
 )]
-pub async fn add(ctx: Context<'_>, mut message: String) -> Result<(), Error> {
+pub async fn add(ctx: Context<'_>, message: String) -> Result<(), Error> {
     // Since this command is guild_only this should NEVER fail
     let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
-
-    if !message.contains("{}") {
-        message += " {}"
-    }
 
     sqlx::query!("UPDATE guild SET welcome_messages = array_append(welcome_messages, $1) WHERE guild.discord_id = $2", message, &guild)
         .execute(&ctx.data().db)

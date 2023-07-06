@@ -1,4 +1,4 @@
-use crate::{data::init_guild, Context, Error};
+use crate::{database::init_guild, Context, Error};
 
 #[poise::command(prefix_command, slash_command, subcommands("init"))]
 pub async fn guild(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
@@ -9,7 +9,6 @@ pub async fn guild(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
 #[poise::command(
     slash_command,
     prefix_command,
-    track_edits,
     guild_only,
     required_permissions = "MANAGE_GUILD"
 )]
