@@ -49,7 +49,10 @@ pub async fn manage_starboard_entry(
 
     // Return if we don't have a starboard for this emoji
     let (starboard_channel, min_reactions) = match possible_starboard {
-        Some(record) => (record.starboard_channel.into_serenity(), record.min_reactions),
+        Some(record) => (
+            record.starboard_channel.into_serenity(),
+            record.min_reactions,
+        ),
         None => return Ok(()),
     };
 
@@ -95,7 +98,7 @@ async fn add_or_edit_starboard_entry(
     channel: ChannelId,
 ) -> Result<(), Error> {
     let possible_entry = sqlx::query!(
-        r#"SELECT starboard_post_id as "id: database::MessageId", starboard_channel as "channel: database::ChannelId", reaction_count FROM starboard_tracked 
+        r#"SELECT starboard_post_id as "id: database::MessageId", starboard_channel as "channel: database::ChannelId" FROM starboard_tracked 
                     WHERE starboard_tracked.message_id = $1 AND starboard_tracked.emoji = $2"#,
         message.id.0 as i64,
         emoji_string
@@ -110,21 +113,13 @@ async fn add_or_edit_starboard_entry(
                 data,
                 post.id.into_serenity(),
                 post.channel.into_serenity(),
-                post.reaction_count,
+                reactions.len(),
                 emoji_string,
             )
             .await?
         }
         None => {
-            add_starboard_entry(
-                ctx,
-                data,
-                message,
-                channel,
-                emoji_string,
-                reactions.len().try_into()?,
-            )
-            .await?
+            add_starboard_entry(ctx, data, message, channel, emoji_string, reactions.len()).await?
         }
     }
 
@@ -138,7 +133,7 @@ async fn add_starboard_entry(
     message: &Message,
     starboard_channel: ChannelId,
     emoji_string: &str,
-    current_reactions: i32,
+    current_reactions: usize,
 ) -> Result<(), Error> {
     // Formatting message
     let link = format!("[Jump!]({})", message.link());
@@ -154,7 +149,7 @@ async fn add_starboard_entry(
                     a.icon_url(message.author.face())
                         .name(message.author.name.clone())
                 })
-                .description(message.content_safe(ctx))
+                .description(message.content.as_str())
                 .field("Source", link, false)
                 .color(EMBED_COLOR)
                 .footer(|f| f.text(message.id))
@@ -178,7 +173,7 @@ async fn add_starboard_entry(
         emoji_string,
         starboard_channel.0 as i64,
         post.id.0 as i64,
-        current_reactions
+        current_reactions as i32
     ).execute(&data.db)
     .await?;
 
@@ -191,7 +186,7 @@ async fn edit_starboard_entry(
     data: &Data,
     message: MessageId,
     channel: ChannelId,
-    reactions: i32,
+    reactions: usize,
     emoji_string: &str,
 ) -> Result<(), Error> {
     let mut post = channel.message(ctx, message).await?;
@@ -200,7 +195,7 @@ async fn edit_starboard_entry(
         "UPDATE starboard_tracked SET reaction_count = $3 WHERE starboard_tracked.starboard_post_id = $1 AND starboard_tracked.emoji = $2",
         message.0 as i64,
         emoji_string,
-        &reactions
+        reactions as i32
     ).execute(&data.db)
     .await?;
 

@@ -1,11 +1,11 @@
 use std::mem;
 
+use crate::database;
 use crate::{serenity, Data, Error};
 use poise::serenity_prelude::{Mention, Mentionable};
 use serenity::model::channel::MessageFlags;
 use serenity::{ChannelId, Context, Member};
 use std::fmt::Write;
-use crate::database;
 
 pub async fn handle(new_member: &Member, data: &Data, ctx: &Context) -> Result<(), Error> {
     let channel = new_member.guild_id.0 as i64;

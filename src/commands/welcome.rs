@@ -32,11 +32,7 @@ pub async fn add(ctx: Context<'_>, message: String) -> Result<(), Error> {
 }
 
 ///Lists all current welcome messages
-#[poise::command(
-    slash_command,
-    prefix_command,
-    guild_only,
-)]
+#[poise::command(slash_command, prefix_command, guild_only)]
 pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     // SAFETY: Since this command is guild_only this should NEVER fail
     let guild = ctx.guild_id().unwrap().0 as i64;
