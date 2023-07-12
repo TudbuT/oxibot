@@ -144,24 +144,43 @@ async fn add_starboard_entry(
     // Post embed
     let post = starboard_channel
         .send_message(ctx, |m| {
-            m.content(starboard_message).embed(|e| {
+            m.content(starboard_message);
+
+            let mut attachments = message.attachments.iter().take(10).enumerate();
+
+            m.add_embed(|e| {
                 e.author(|a| {
                     a.icon_url(message.author.face())
                         .name(message.author.name.clone())
                 })
+                .url("http://example.com/0") // Required for embed images to group
                 .description(message.content.as_str())
                 .field("Source", link, false)
-                .color(EMBED_COLOR)
-                .footer(|f| f.text(message.id))
-                .timestamp(message.timestamp.to_string());
+                .color(EMBED_COLOR);
 
-                // if the message has a file, try to make it a thumbnail
-                if !message.attachments.is_empty() {
-                    e.image(message.attachments[0].url.clone())
-                } else {
-                    e
+                if let Some((_, attachment)) = attachments.next() {
+                    e.image(attachment.url.as_str());
                 }
-            })
+
+                e
+            });
+
+            for (i, attachment) in attachments {
+                m.add_embed(|e| {
+                    e.color(EMBED_COLOR)
+                        .url(format!("http://example.com/{}", i / 4))
+                        .image(attachment.url.as_str());
+
+                    if i / 4 == message.attachments.len() / 4 && i % 4 == 0  {
+                        e.footer(|f| f.text(message.id))
+                            .timestamp(message.timestamp);
+                    }
+
+                    e
+                });
+            }
+
+            m
         })
         .await?;
 
