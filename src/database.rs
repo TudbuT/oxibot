@@ -1,8 +1,11 @@
-use sqlx::{postgres::PgPoolOptions, PgPool, Error};
 use poise::serenity_prelude::GuildId;
+use sqlx::{postgres::PgPoolOptions, Error, PgPool};
 use std::env;
 
+mod ids;
 pub mod starboard;
+
+pub use ids::*;
 
 // Data shared across commands and events
 pub struct Data {
@@ -32,12 +35,12 @@ pub async fn init_data() -> Data {
     Data::new(database)
 }
 
-/// Creates a table for the provided guild ID. Errors if there is already a table present,
+/// Creates a table for the provided guild ID. Errors if there is already a table present
 /// or if the database errors.
 pub async fn init_guild(data: &Data, guild_id: GuildId) -> Result<(), Error> {
     sqlx::query!(
         "INSERT INTO guild (discord_id) VALUES ($1)",
-        &guild_id.as_u64().to_be_bytes()
+        guild_id.0 as i64
     )
     .execute(&data.db)
     .await?;

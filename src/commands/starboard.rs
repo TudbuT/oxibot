@@ -1,4 +1,4 @@
-use crate::data::starboard::{add_starboard_tables, delete_starboard_tables};
+use crate::database::starboard::{add_starboard_tables, delete_starboard_tables};
 use crate::serenity::{Channel, ReactionType};
 use crate::{Context, Error};
 
@@ -12,7 +12,6 @@ pub async fn starboard(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
 #[poise::command(
     slash_command,
     prefix_command,
-    track_edits,
     guild_only,
     required_permissions = "MANAGE_CHANNELS"
 )]
@@ -22,9 +21,12 @@ pub async fn create(
     #[description = "A custom emoji instead of a star"] emoji: Option<ReactionType>,
     #[description = "How many reactions you need to get onto starboard"] min_reactions: Option<i32>,
 ) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
+    // SAFETY: Since this command is guild_only this should NEVER fail
     let guild = ctx.guild_id().unwrap();
-    let starboard = starboard.as_ref().map(Channel::id).unwrap_or(ctx.channel_id());
+    let starboard = starboard
+        .as_ref()
+        .map(Channel::id)
+        .unwrap_or(ctx.channel_id());
 
     let min_reactions = min_reactions.unwrap_or(3);
 
@@ -49,25 +51,20 @@ pub async fn create(
 #[poise::command(
     slash_command,
     prefix_command,
-    track_edits,
     guild_only,
     required_permissions = "MANAGE_CHANNELS"
 )]
 pub async fn delete(
     ctx: Context<'_>,
     #[description = "The channel to remove starboard from"] starboard: Option<Channel>,
-    #[description = "Whether to delete the channel afterwards. Default is false."] delete: Option<
-        bool,
-    >,
 ) -> Result<(), Error> {
     let data = ctx.data();
-    let starboard = starboard.as_ref().map(Channel::id).unwrap_or(ctx.channel_id());
+    let starboard = starboard
+        .as_ref()
+        .map(Channel::id)
+        .unwrap_or(ctx.channel_id());
 
-    delete_starboard_tables(data, starboard.as_u64()).await?;
-
-    if delete.unwrap_or(false) {
-        starboard.delete(ctx).await?;
-    }
+    delete_starboard_tables(data, starboard).await?;
 
     ctx.say("Done!").await?;
 

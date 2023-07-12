@@ -1,6 +1,7 @@
-use poise::serenity_prelude::{ChannelId, GuildId, Context, Message, MessageId, Reaction, User};
-use sqlx::Error as SQLxError;
+use crate::database;
 use crate::{Data, Error, EMBED_COLOR};
+use poise::serenity_prelude::{ChannelId, Context, GuildId, Message, MessageId, Reaction, User};
+use sqlx::Error as SQLxError;
 
 pub async fn add_starboard_tables(
     data: &Data,
@@ -11,9 +12,9 @@ pub async fn add_starboard_tables(
 ) -> Result<(), SQLxError> {
     sqlx::query!(
         "INSERT INTO starboard (guild_id, emoji, starboard_channel, min_reactions) VALUES ($1, $2, $3, $4)",
-        &guild_id.as_u64().to_be_bytes(),
+        guild_id.0 as i64,
         emoji,
-        &channel_id.as_u64().to_be_bytes(),
+        channel_id.0 as i64,
         min_reactions
     )
     .execute(&data.db)
@@ -30,7 +31,7 @@ pub async fn manage_starboard_entry(
 ) -> Result<(), Error> {
     // Check if this reaction is in a guild, and get guild id
     let guild_id = match reaction.guild_id {
-        Some(guild) => guild.as_u64().to_be_bytes(),
+        Some(GuildId(id)) => id as i64,
         None => return Ok(()),
     };
 
@@ -38,22 +39,22 @@ pub async fn manage_starboard_entry(
     let emoji_string = emoji.to_string();
 
     let possible_starboard = sqlx::query!(
-        r#"SELECT starboard_channel as "starboard_channel: [u8; 8]", min_reactions FROM starboard 
+        r#"SELECT starboard_channel as "starboard_channel: database::ChannelId", min_reactions FROM starboard 
                     WHERE starboard.guild_id = $1 AND starboard.emoji = $2"#,
-        &guild_id,
+                    guild_id,
         emoji_string
     )
     .fetch_optional(&data.db)
-    .await?
-    .map(|record| (record.starboard_channel, record.min_reactions));
+    .await?;
 
     // Return if we don't have a starboard for this emoji
     let (starboard_channel, min_reactions) = match possible_starboard {
-        Some(starboard) => starboard,
+        Some(record) => (
+            record.starboard_channel.into_serenity(),
+            record.min_reactions,
+        ),
         None => return Ok(()),
     };
-
-    let starboard_channel = ChannelId(u64::from_be_bytes(starboard_channel));
 
     let message = reaction.message(ctx).await?;
 
@@ -62,7 +63,7 @@ pub async fn manage_starboard_entry(
         .await
         .unwrap_or(vec![]);
 
-    let length = { 
+    let length = {
         if reactions.contains(&message.author) {
             reactions.len() - 1
         } else {
@@ -97,29 +98,28 @@ async fn add_or_edit_starboard_entry(
     channel: ChannelId,
 ) -> Result<(), Error> {
     let possible_entry = sqlx::query!(
-        r#"SELECT starboard_channel as "starboard_channel: [u8; 8]", starboard_post_id as "starboard_post_id: [u8; 8]", reaction_count FROM starboard_tracked 
+        r#"SELECT starboard_post_id as "id: database::MessageId", starboard_channel as "channel: database::ChannelId" FROM starboard_tracked 
                     WHERE starboard_tracked.message_id = $1 AND starboard_tracked.emoji = $2"#,
-        &message.id.as_u64().to_be_bytes(),
+        message.id.0 as i64,
         emoji_string
     )
     .fetch_optional(&data.db)
-    .await?
-    .map(|record| (ChannelId(u64::from_be_bytes(record.starboard_channel)), MessageId(u64::from_be_bytes(record.starboard_post_id)), record.reaction_count));
+    .await?;
 
     match possible_entry {
-        Some((channel, post_id, reactions)) => {
-            edit_starboard_entry(ctx, data, post_id, channel, reactions, emoji_string).await?
-        }
-        None => {
-            add_starboard_entry(
+        Some(post) => {
+            edit_starboard_entry(
                 ctx,
                 data,
-                message,
-                channel,
+                post.id.into_serenity(),
+                post.channel.into_serenity(),
+                reactions.len(),
                 emoji_string,
-                reactions.len().try_into()?,
             )
             .await?
+        }
+        None => {
+            add_starboard_entry(ctx, data, message, channel, emoji_string, reactions.len()).await?
         }
     }
 
@@ -133,7 +133,7 @@ async fn add_starboard_entry(
     message: &Message,
     starboard_channel: ChannelId,
     emoji_string: &str,
-    current_reactions: i32,
+    current_reactions: usize,
 ) -> Result<(), Error> {
     // Formatting message
     let link = format!("[Jump!]({})", message.link());
@@ -144,24 +144,43 @@ async fn add_starboard_entry(
     // Post embed
     let post = starboard_channel
         .send_message(ctx, |m| {
-            m.content(starboard_message).embed(|e| {
+            m.content(starboard_message);
+
+            let mut attachments = message.attachments.iter().take(10).enumerate();
+
+            m.add_embed(|e| {
                 e.author(|a| {
                     a.icon_url(message.author.face())
                         .name(message.author.name.clone())
                 })
-                .description(message.content_safe(ctx))
+                .url("http://example.com/0") // Required for embed images to group
+                .description(message.content.as_str())
                 .field("Source", link, false)
-                .color(EMBED_COLOR)
-                .footer(|f| f.text(message.id))
-                .timestamp(message.timestamp.to_string());
+                .color(EMBED_COLOR);
 
-                // if the message has a file, try to make it a thumbnail
-                if !message.attachments.is_empty() {
-                    e.image(message.attachments[0].url.clone())
-                } else {
-                    e
+                if let Some((_, attachment)) = attachments.next() {
+                    e.image(attachment.url.as_str());
                 }
-            })
+
+                e
+            });
+
+            for (i, attachment) in attachments {
+                m.add_embed(|e| {
+                    e.color(EMBED_COLOR)
+                        .url(format!("http://example.com/{}", i / 4))
+                        .image(attachment.url.as_str());
+
+                    if i / 4 == message.attachments.len() / 4 && i % 4 == 0  {
+                        e.footer(|f| f.text(message.id))
+                            .timestamp(message.timestamp);
+                    }
+
+                    e
+                });
+            }
+
+            m
         })
         .await?;
 
@@ -169,11 +188,11 @@ async fn add_starboard_entry(
     sqlx::query!(
         r#"INSERT INTO starboard_tracked 
         (message_id, emoji, starboard_channel, starboard_post_id, reaction_count) VALUES ($1, $2, $3, $4, $5)"#,
-        &message.id.as_u64().to_be_bytes(),
+        message.id.0 as i64,
         emoji_string,
-        &starboard_channel.as_u64().to_be_bytes(),
-        &post.id.as_u64().to_be_bytes(),
-        current_reactions
+        starboard_channel.0 as i64,
+        post.id.0 as i64,
+        current_reactions as i32
     ).execute(&data.db)
     .await?;
 
@@ -186,16 +205,16 @@ async fn edit_starboard_entry(
     data: &Data,
     message: MessageId,
     channel: ChannelId,
-    reactions: i32,
+    reactions: usize,
     emoji_string: &str,
 ) -> Result<(), Error> {
     let mut post = channel.message(ctx, message).await?;
 
     sqlx::query!(
         "UPDATE starboard_tracked SET reaction_count = $3 WHERE starboard_tracked.starboard_post_id = $1 AND starboard_tracked.emoji = $2",
-        &message.as_u64().to_be_bytes(),
+        message.0 as i64,
         emoji_string,
-        &reactions
+        reactions as i32
     ).execute(&data.db)
     .await?;
 
@@ -214,17 +233,17 @@ pub async fn remove_starboard_entry_with_channel(
     message: &MessageId,
     starboard_channel: ChannelId,
 ) -> Result<(), Error> {
-    let entries = sqlx::query!(
+    let records = sqlx::query!(
         r#"DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1 AND starboard_tracked.starboard_channel = $2
-        RETURNING starboard_post_id as "starboard_post_id: [u8; 8]""#,
-        &message.as_u64().to_be_bytes(),
-        &starboard_channel.as_u64().to_be_bytes()
+        RETURNING starboard_post_id as "starboard_post_id: database::MessageId""#,
+        message.0 as i64,
+        starboard_channel.0 as i64
     )
     .fetch_all(&data.db)
     .await?;
 
-    for entry in entries {
-        let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
+    for record in records {
+        let message = record.starboard_post_id.into_serenity();
 
         starboard_channel.delete_message(ctx, message).await?;
     }
@@ -241,17 +260,17 @@ pub async fn remove_starboard_entry(
     // Remove + get all entries with the message id. This should return a vec of length zero or one, but is not guaranteed
     let entries: Vec<_> = sqlx::query!(
         r#"DELETE FROM starboard_tracked WHERE starboard_tracked.message_id = $1
-        RETURNING starboard_post_id as "starboard_post_id: [u8; 8]", starboard_channel as "starboard_channel: [u8; 8]""#,
-        &message.as_u64().to_be_bytes(),
+        RETURNING starboard_post_id as "starboard_post_id: database::MessageId", starboard_channel as "starboard_channel: database::ChannelId""#,
+        message.0 as i64,
     )
     .fetch_all(&data.db)
     .await?;
 
     // If there are duplicate entries, delete all of them
     for entry in entries {
-        let message = MessageId(u64::from_be_bytes(entry.starboard_post_id));
+        let message = entry.starboard_post_id.into_serenity();
 
-        let starboard_channel = ChannelId(u64::from_be_bytes(entry.starboard_channel));
+        let starboard_channel = entry.starboard_channel.into_serenity();
 
         starboard_channel.delete_message(ctx, message).await?;
     }
@@ -260,23 +279,23 @@ pub async fn remove_starboard_entry(
 }
 
 /// Remove the starboard tables associated with `channel_id`
-pub async fn delete_starboard_tables(data: &Data, channel_id: &u64) -> Result<(), SQLxError> {
-    let id = channel_id.to_be_bytes();
+pub async fn delete_starboard_tables(data: &Data, channel_id: ChannelId) -> Result<(), SQLxError> {
+    let id = channel_id.0 as i64;
 
     let mut trans = data.db.begin().await?;
 
     sqlx::query!(
         "DELETE FROM starboard_tracked WHERE starboard_tracked.starboard_channel = $1",
-        &id
+        id
     )
-    .execute(&mut trans)
+    .execute(trans.as_mut())
     .await?;
 
     sqlx::query!(
         "DELETE FROM starboard WHERE starboard.starboard_channel = $1",
-        &id
+        id
     )
-    .execute(&mut trans)
+    .execute(trans.as_mut())
     .await?;
 
     trans.commit().await?;

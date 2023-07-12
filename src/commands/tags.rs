@@ -2,8 +2,8 @@ use crate::{Context, Error};
 
 #[poise::command(prefix_command, guild_only, slash_command, aliases("t", "tag"))]
 pub async fn tags(ctx: Context<'_>, arg: String) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
     let possible_tag = sqlx::query!(
         "SELECT tag_description FROM tag WHERE tag.guild_id = $1 AND tag.command_name = $2",
@@ -25,12 +25,12 @@ pub async fn tags(ctx: Context<'_>, arg: String) -> Result<(), Error> {
 pub async fn tag_list(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer_ephemeral().await?;
 
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
     let tags = sqlx::query!(
         "SELECT command_name, tag_description FROM tag WHERE tag.guild_id = $1",
-        &guild
+        guild
     )
     .fetch_all(&ctx.data().db)
     .await?;
@@ -75,12 +75,12 @@ pub async fn tag_edit(_ctx: Context<'_>, _arg: String) -> Result<(), Error> {
     required_permissions = "MANAGE_MESSAGES"
 )]
 async fn add(ctx: Context<'_>, name: String, #[rest] description: String) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
     sqlx::query!(
         "INSERT INTO tag (guild_id, command_name, tag_description) VALUES ($1, $2, $3)",
-        &guild,
+        guild,
         name,
         description
     )
@@ -104,13 +104,13 @@ async fn edit(
     name: String,
     #[rest] new_description: String,
 ) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
     sqlx::query!(
         "UPDATE tag SET tag_description = $1 WHERE tag.guild_id = $2 AND tag.command_name = $3",
         new_description,
-        &guild,
+        guild,
         name
     )
     .execute(&ctx.data().db)
@@ -130,12 +130,12 @@ async fn edit(
     required_permissions = "MANAGE_MESSAGES"
 )]
 async fn remove(ctx: Context<'_>, name: String) -> Result<(), Error> {
-    // Since this command is guild_only this should NEVER fail
-    let guild = ctx.guild_id().unwrap().as_u64().to_be_bytes();
+    // SAFETY: Since this command is guild_only this should NEVER fail
+    let guild = ctx.guild_id().unwrap().0 as i64;
 
     sqlx::query!(
         "DELETE FROM tag WHERE tag.guild_id = $1 AND tag.command_name = $2",
-        &guild,
+        guild,
         name
     )
     .execute(&ctx.data().db)
