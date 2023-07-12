@@ -57,9 +57,6 @@ pub async fn create(
 pub async fn delete(
     ctx: Context<'_>,
     #[description = "The channel to remove starboard from"] starboard: Option<Channel>,
-    #[description = "Whether to delete the channel afterwards. Default is false."] delete: Option<
-        bool,
-    >,
 ) -> Result<(), Error> {
     let data = ctx.data();
     let starboard = starboard
@@ -68,10 +65,6 @@ pub async fn delete(
         .unwrap_or(ctx.channel_id());
 
     delete_starboard_tables(data, starboard).await?;
-
-    if delete.unwrap_or(false) {
-        starboard.delete(ctx).await?;
-    }
 
     ctx.say("Done!").await?;
 
